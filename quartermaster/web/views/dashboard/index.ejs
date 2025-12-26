@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Select Server</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <h1>Select a Server</h1>
+            <p>Choose a server to manage</p>
+
+            <div class="server-grid">
+                <% mutualGuilds.forEach(guild => { %>
+                    <a href="/dashboard/server/<%= guild.id %>" class="server-card">
+                        <% if (guild.icon) { %>
+                            <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+                        <% } else { %>
+                            <div class="server-icon-placeholder"><%= guild.name.charAt(0) %></div>
+                        <% } %>
+                        <h3><%= guild.name %></h3>
+                        <span class="badge badge-success">Bot Added</span>
+                    </a>
+                <% }); %>
+
+                <% guilds.filter(g => !mutualGuilds.find(mg => mg.id === g.id)).forEach(guild => { %>
+                    <div class="server-card server-card-disabled">
+                        <% if (guild.icon) { %>
+                            <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+                        <% } else { %>
+                            <div class="server-icon-placeholder"><%= guild.name.charAt(0) %></div>
+                        <% } %>
+                        <h3><%= guild.name %></h3>
+                        <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.CLIENT_ID %>&permissions=8&scope=bot&guild_id=<%= guild.id %>"
+                           class="btn btn-small btn-primary" target="_blank">Add Bot</a>
+                    </div>
+                <% }); %>
+            </div>
+
+            <% if (guilds.length === 0) { %>
+                <div class="empty-state">
+                    <h2>No Servers Found</h2>
+                    <p>You need to have "Manage Server" permission to configure the bot.</p>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

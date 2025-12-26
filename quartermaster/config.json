@@ -1,0 +1,28 @@
+{
+  "leveling": {
+    "enabled": true,
+    "xpPerMessage": {
+      "min": 15,
+      "max": 25
+    },
+    "cooldown": 60,
+    "levelUpMessage": "Congratulations {user}, you just advanced to level {level}!",
+    "roleRewards": {}
+  },
+  "moderation": {
+    "enabled": true,
+    "muteRoleName": "Muted",
+    "logChannelName": "mod-logs"
+  },
+  "welcome": {
+    "enabled": false,
+    "channelName": "welcome",
+    "message": "Welcome {user} to {server}!",
+    "embedColor": "#5865F2"
+  },
+  "leave": {
+    "enabled": false,
+    "channelName": "welcome",
+    "message": "{user} has left {server}."
+  }
+}

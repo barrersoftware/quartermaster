@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> - Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="server-header">
+                <% if (userGuild.icon) { %>
+                    <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= userGuild.icon %>.png" alt="<%= guild.name %>" class="server-icon-large">
+                <% } else { %>
+                    <div class="server-icon-large server-icon-placeholder"><%= guild.name.charAt(0) %></div>
+                <% } %>
+                <div>
+                    <h1><%= guild.name %></h1>
+                    <p><%= stats.memberCount %> members</p>
+                </div>
+            </div>
+
+            <!-- Server Stats Overview -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-content">
+                        <div class="stat-value"><%= stats.memberCount %></div>
+                        <div class="stat-label">Total Members</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-content">
+                        <div class="stat-value"><%= stats.activeUsers %></div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-value"><%= stats.totalXP.toLocaleString() %></div>
+                        <div class="stat-label">Total XP Earned</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎭</div>
+                    <div class="stat-content">
+                        <div class="stat-value"><%= stats.roleRewards %></div>
+                        <div class="stat-label">Role Rewards</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Members -->
+            <% if (leaderboard.length > 0) { %>
+            <div class="dashboard-section">
+                <h2>🏆 Top Members</h2>
+                <div class="leaderboard-mini">
+                    <% leaderboard.forEach((user, index) => { %>
+                        <div class="leaderboard-row">
+                            <div class="leaderboard-rank">#<%= index + 1 %></div>
+                            <% if (user.avatar) { %>
+                                <img src="<%= user.avatar %>" alt="<%= user.username %>" class="user-avatar-small">
+                            <% } %>
+                            <div class="leaderboard-user">
+                                <strong><%= user.displayName %></strong>
+                                <small>@<%= user.username %></small>
+                            </div>
+                            <div class="leaderboard-stats">
+                                <span class="badge badge-info">Level <%= user.level %></span>
+                                <span class="stat-xp"><%= user.xp.toLocaleString() %> XP</span>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+                <a href="/dashboard/server/<%= guild.id %>/leaderboard" class="btn btn-secondary">View Full Leaderboard</a>
+            </div>
+            <% } %>
+
+            <!-- Recent Warnings -->
+            <% if (recentWarnings.length > 0) { %>
+            <div class="dashboard-section">
+                <h2>⚠️ Recent Warnings</h2>
+                <div class="warnings-mini">
+                    <% recentWarnings.forEach(warning => { %>
+                        <div class="warning-row">
+                            <div class="warning-user"><strong><%= warning.username %></strong></div>
+                            <div class="warning-reason"><%= warning.reason || 'No reason provided' %></div>
+                            <div class="warning-mod">by <%= warning.moderatorName %></div>
+                            <div class="warning-date"><%= new Date(warning.timestamp * 1000).toLocaleDateString() %></div>
+                        </div>
+                    <% }); %>
+                </div>
+                <a href="/dashboard/server/<%= guild.id %>/moderation" class="btn btn-secondary">View All Warnings</a>
+            </div>
+            <% } %>
+
+            <!-- Module Cards -->
+            <h2>📋 Configuration</h2>
+            <div class="module-grid">
+                <a href="/dashboard/server/<%= guild.id %>/leveling" class="module-card">
+                    <div class="module-icon">📊</div>
+                    <h3>Leveling</h3>
+                    <p>Configure XP and role rewards</p>
+                    <span class="badge <%= config.leveling.enabled ? 'badge-success' : 'badge-disabled' %>">
+                        <%= config.leveling.enabled ? 'Enabled' : 'Disabled' %>
+                    </span>
+                </a>
+
+                <a href="/dashboard/server/<%= guild.id %>/leaderboard" class="module-card">
+                    <div class="module-icon">🏆</div>
+                    <h3>Leaderboard</h3>
+                    <p>View top members by level</p>
+                </a>
+
+                <a href="/dashboard/server/<%= guild.id %>/commands" class="module-card">
+                    <div class="module-icon">⚙️</div>
+                    <h3>Custom Commands</h3>
+                    <p>Manage custom commands</p>
+                </a>
+
+                <a href="/dashboard/server/<%= guild.id %>/welcome" class="module-card">
+                    <div class="module-icon">👋</div>
+                    <h3>Welcome & Leave</h3>
+                    <p>Configure welcome/leave messages</p>
+                    <span class="badge <%= config.welcome.enabled ? 'badge-success' : 'badge-disabled' %>">
+                        <%= config.welcome.enabled ? 'Enabled' : 'Disabled' %>
+                    </span>
+                </a>
+
+                <a href="/dashboard/server/<%= guild.id %>/moderation" class="module-card">
+                    <div class="module-icon">🛡️</div>
+                    <h3>Moderation</h3>
+                    <p>View warnings and mod logs</p>
+                </a>
+
+                <a href="/dashboard/server/<%= guild.id %>/raid" class="module-card">
+                    <div class="module-icon">🚨</div>
+                    <h3>Raid Protection</h3>
+                    <p>Configure anti-raid measures</p>
+                    <span class="badge <%= raidSettings.enabled ? 'badge-success' : 'badge-disabled' %>">
+                        <%= raidSettings.enabled ? 'Enabled' : 'Disabled' %>
+                    </span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

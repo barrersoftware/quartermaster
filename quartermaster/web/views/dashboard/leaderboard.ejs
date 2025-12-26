@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Leaderboard</span>
+            </div>
+
+            <h1>Leaderboard</h1>
+
+            <div class="settings-section">
+                <% if (leaderboard.length === 0) { %>
+                    <div class="empty-state">
+                        <h2>No Data Yet</h2>
+                        <p>Users haven't earned any XP yet. The leaderboard will appear once members start chatting!</p>
+                    </div>
+                <% } else { %>
+                    <div class="leaderboard-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>User</th>
+                                    <th>Level</th>
+                                    <th>Total XP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% leaderboard.forEach((entry, index) => {
+                                    const member = guild.members.cache.get(entry.user_id);
+                                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                                %>
+                                    <tr class="<%= index < 3 ? 'top-rank' : '' %>">
+                                        <td><strong><%= medal %> #<%= index + 1 %></strong></td>
+                                        <td>
+                                            <div class="user-info">
+                                                <% if (member) { %>
+                                                    <img src="<%= member.user.displayAvatarURL() %>" alt="<%= member.user.tag %>" class="user-avatar-small">
+                                                    <%= member.user.tag %>
+                                                <% } else { %>
+                                                    <span>User ID: <%= entry.user_id %></span>
+                                                <% } %>
+                                            </div>
+                                        </td>
+                                        <td><strong>Level <%= entry.level %></strong></td>
+                                        <td><%= entry.xp.toLocaleString() %> XP</td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

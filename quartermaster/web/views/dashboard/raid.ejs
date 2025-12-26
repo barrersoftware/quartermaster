@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raid Protection - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Raid Protection</span>
+            </div>
+
+            <h1>🛡️ Raid Protection</h1>
+
+            <form id="raidForm">
+                <div class="settings-section">
+                    <h2>General Settings</h2>
+
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <span class="toggle-slider-container">
+                                <input type="checkbox" name="enabled" <%= settings.enabled ? 'checked' : '' %>>
+                                <span class="toggle-slider"></span>
+                            </span>
+                            <span>Enable Raid Protection</span>
+                        </label>
+                        <small>Automatically detect and respond to server raids</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Join Threshold</label>
+                            <input type="number" name="joinThreshold" value="<%= settings.join_threshold %>" min="2" max="50">
+                            <small>Number of joins to trigger detection</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Time Window (seconds)</label>
+                            <input type="number" name="timeWindow" value="<%= settings.time_window %>" min="5" max="300">
+                            <small>Time period to monitor joins</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Alert Channel</label>
+                        <select name="alertChannel">
+                            <option value="">Select a channel...</option>
+                            <% channels.forEach(channel => { %>
+                                <option value="<%= channel.name %>" <%= settings.alert_channel === channel.name ? 'selected' : '' %>>
+                                    #<%= channel.name %>
+                                </option>
+                            <% }); %>
+                        </select>
+                        <small>Channel to send raid alerts</small>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Automated Response</h2>
+
+                    <div class="form-group">
+                        <label>Action on Raid Detection</label>
+                        <select name="action">
+                            <option value="alert" <%= settings.action === 'alert' ? 'selected' : '' %>>Alert Only (No Action)</option>
+                            <option value="kick" <%= settings.action === 'kick' ? 'selected' : '' %>>Kick Raiders</option>
+                            <option value="ban" <%= settings.action === 'ban' ? 'selected' : '' %>>Ban Raiders</option>
+                            <option value="lockdown" <%= settings.action === 'lockdown' ? 'selected' : '' %>>Server Lockdown</option>
+                        </select>
+                        <small>What to do when a raid is detected</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Lockdown Duration (seconds)</label>
+                        <input type="number" name="lockdownDuration" value="<%= settings.lockdown_duration %>" min="60" max="3600">
+                        <small>How long to keep server in lockdown mode (if lockdown action selected)</small>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+
+            <div class="settings-section">
+                <h2>How Raid Protection Works</h2>
+                <div class="info-box">
+                    <ul>
+                        <li><strong>Monitoring:</strong> Tracks all member joins in real-time</li>
+                        <li><strong>Detection:</strong> Triggers when <em>X</em> users join within <em>Y</em> seconds</li>
+                        <li><strong>Alert:</strong> Sends notification to designated alert channel</li>
+                        <li><strong>Response:</strong> Automatically takes configured action (alert, kick, ban, or lockdown)</li>
+                        <li><strong>Lockdown Mode:</strong> Temporarily kicks all new joins until lockdown period expires</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h2>Recent Raid Incidents (<%= incidents.length %>)</h2>
+
+                <% if (incidents.length === 0) { %>
+                    <div class="empty-state">
+                        <p>No raids detected yet. Your server is safe! 🎉</p>
+                    </div>
+                <% } else { %>
+                    <div class="warnings-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Users Joined</th>
+                                    <th>Action Taken</th>
+                                    <th>Users Affected</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% incidents.forEach(incident => {
+                                    const usersAffected = JSON.parse(incident.users_affected || '[]');
+                                %>
+                                    <tr>
+                                        <td><%= new Date(incident.detected_at * 1000).toLocaleString() %></td>
+                                        <td><strong><%= incident.user_count %></strong></td>
+                                        <td>
+                                            <span class="badge <%= incident.action_taken === 'ban' ? 'badge-danger' : incident.action_taken === 'kick' ? 'badge-warning' : 'badge-info' %>">
+                                                <%= incident.action_taken.toUpperCase() %>
+                                            </span>
+                                        </td>
+                                        <td><%= usersAffected.length %></td>
+                                        <td>
+                                            <% if (incident.resolved) { %>
+                                                <span class="badge badge-success">Resolved</span>
+                                            <% } else { %>
+                                                <span class="badge badge-warning">Active</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        document.getElementById('raidForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            const response = await fetch(`/api/server/${guildId}/raid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    enabled: formData.get('enabled') === 'on',
+                    joinThreshold: formData.get('joinThreshold'),
+                    timeWindow: formData.get('timeWindow'),
+                    action: formData.get('action'),
+                    alertChannel: formData.get('alertChannel'),
+                    lockdownDuration: formData.get('lockdownDuration')
+                })
+            });
+
+            const data = await response.json();
+            showNotification(data.message || data.error, response.ok ? 'success' : 'error');
+        });
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "name": "bosun",
+  "version": "1.0.0",
+  "description": "Bosun - Independent Discord server management bot. Maintains order like a pirate bosun manages the ship. No subscriptions, no corporate bullshit.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "server-management",
+    "leveling",
+    "moderation",
+    "self-hosted"
+  ],
+  "author": "Captain CP",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^9.2.2",
+    "body-parser": "^1.20.2",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "node-fetch": "^3.3.2",
+    "passport": "^0.7.0",
+    "passport-discord": "^0.1.4"
+  }
+}

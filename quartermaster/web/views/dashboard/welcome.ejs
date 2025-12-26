@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome & Leave - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Welcome & Leave</span>
+            </div>
+
+            <h1>Welcome & Leave Messages</h1>
+
+            <form id="welcomeForm">
+                <div class="settings-section">
+                    <h2>Welcome Messages</h2>
+
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" name="welcomeEnabled" <%= config.welcome.enabled ? 'checked' : '' %>>
+                            <span class="toggle-slider"></span>
+                            Enable Welcome Messages
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Welcome Channel</label>
+                        <select name="welcomeChannel">
+                            <% channels.forEach(channel => { %>
+                                <option value="<%= channel.name %>" <%= config.welcome.channelName === channel.name ? 'selected' : '' %>>
+                                    #<%= channel.name %>
+                                </option>
+                            <% }); %>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Welcome Message</label>
+                        <textarea name="welcomeMessage" rows="3"><%= config.welcome.message %></textarea>
+                        <small>Available placeholders: {user}, {server}, {memberCount}</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Embed Color</label>
+                        <input type="color" name="welcomeColor" value="<%= config.welcome.embedColor %>">
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Leave Messages</h2>
+
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" name="leaveEnabled" <%= config.leave.enabled ? 'checked' : '' %>>
+                            <span class="toggle-slider"></span>
+                            Enable Leave Messages
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Leave Channel</label>
+                        <select name="leaveChannel">
+                            <% channels.forEach(channel => { %>
+                                <option value="<%= channel.name %>" <%= config.leave.channelName === channel.name ? 'selected' : '' %>>
+                                    #<%= channel.name %>
+                                </option>
+                            <% }); %>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Leave Message</label>
+                        <textarea name="leaveMessage" rows="3"><%= config.leave.message %></textarea>
+                        <small>Available placeholders: {user}, {server}, {memberCount}</small>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        document.getElementById('welcomeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            const response = await fetch(`/api/server/${guildId}/welcome`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    welcomeEnabled: formData.get('welcomeEnabled') === 'on',
+                    welcomeChannel: formData.get('welcomeChannel'),
+                    welcomeMessage: formData.get('welcomeMessage'),
+                    welcomeColor: formData.get('welcomeColor'),
+                    leaveEnabled: formData.get('leaveEnabled') === 'on',
+                    leaveChannel: formData.get('leaveChannel'),
+                    leaveMessage: formData.get('leaveMessage')
+                })
+            });
+
+            const data = await response.json();
+            showNotification(data.message, response.ok ? 'success' : 'error');
+        });
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

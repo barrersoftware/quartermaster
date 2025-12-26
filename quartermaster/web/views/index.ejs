@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quartermaster - Discord Server Management Bot</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+
+    <div class="hero">
+        <div class="container">
+            <h1>🏴‍☠️ Quartermaster</h1>
+            <p>Discord server management by the Qs. No subscriptions, no corporate bullshit.</p>
+            <div class="hero-buttons">
+                <% if (user) { %>
+                    <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+                <% } else { %>
+                    <a href="/login" class="btn btn-primary">Login with Discord</a>
+                <% } %>
+                <a href="#features" class="btn btn-secondary">Learn More</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="features" id="features">
+        <div class="container">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Leveling System</h3>
+                    <p>Reward active members with XP and role rewards</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Moderation</h3>
+                    <p>Keep your server safe with powerful moderation tools</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚙️</div>
+                    <h3>Auto-Moderation</h3>
+                    <p>Spam detection, link filtering, raid protection</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎭</div>
+                    <h3>Reaction Roles</h3>
+                    <p>Users get roles by reacting to messages</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⏰</div>
+                    <h3>Temp Bans/Mutes</h3>
+                    <p>Auto-unban and timeout management</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🆓</div>
+                    <h3>Self-Hosted & Free</h3>
+                    <p>Your server, your control, no subscriptions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="cta">
+        <div class="container">
+            <h2>Ready to get started?</h2>
+            <% if (user) { %>
+                <a href="/dashboard" class="btn btn-primary btn-large">Open Dashboard</a>
+            <% } else { %>
+                <a href="/login" class="btn btn-primary btn-large">Login with Discord</a>
+            <% } %>
+        </div>
+    </div>
+
+    <%- include('partials/footer') %>
+</body>
+</html>

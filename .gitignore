@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.log
+bot.db
+bot.db-shm
+bot.db-wal
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

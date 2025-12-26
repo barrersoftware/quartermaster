@@ -1,0 +1,19 @@
+<nav class="navbar">
+    <div class="container">
+        <div class="nav-brand">
+            <a href="/">🏴‍☠️ Quartermaster</a>
+        </div>
+        <div class="nav-menu">
+            <% if (user) { %>
+                <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+                <div class="nav-user">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="<%= user.username %>" class="user-avatar">
+                    <span><%= user.username %></span>
+                    <a href="/logout" class="btn btn-outline">Logout</a>
+                </div>
+            <% } else { %>
+                <a href="/login" class="btn btn-primary">Login</a>
+            <% } %>
+        </div>
+    </div>
+</nav>

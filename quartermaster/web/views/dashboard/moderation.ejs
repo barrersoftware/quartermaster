@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderation - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Moderation</span>
+            </div>
+
+            <h1>Moderation Logs</h1>
+
+            <div class="settings-section">
+                <h2>Warning History</h2>
+
+                <% if (warnings.length === 0) { %>
+                    <div class="empty-state">
+                        <p>No warnings have been issued yet.</p>
+                    </div>
+                <% } else { %>
+                    <div class="warnings-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Reason</th>
+                                    <th>Moderator</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% warnings.forEach(warning => {
+                                    const member = guild.members.cache.get(warning.user_id);
+                                    const moderator = guild.members.cache.get(warning.moderator_id);
+                                %>
+                                    <tr>
+                                        <td>
+                                            <% if (member) { %>
+                                                <%= member.user.tag %>
+                                            <% } else { %>
+                                                User ID: <%= warning.user_id %>
+                                            <% } %>
+                                        </td>
+                                        <td><%= warning.reason || 'No reason provided' %></td>
+                                        <td>
+                                            <% if (moderator) { %>
+                                                <%= moderator.user.tag %>
+                                            <% } else { %>
+                                                User ID: <%= warning.moderator_id %>
+                                            <% } %>
+                                        </td>
+                                        <td><%= new Date(warning.timestamp * 1000).toLocaleString() %></td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            </div>
+
+            <div class="info-box">
+                <h3>Moderation Commands</h3>
+                <p>Use these commands in Discord to moderate your server:</p>
+                <ul>
+                    <li><code>!ban @user [reason]</code> - Ban a member</li>
+                    <li><code>!kick @user [reason]</code> - Kick a member</li>
+                    <li><code>!mute @user &lt;minutes&gt; [reason]</code> - Mute a member</li>
+                    <li><code>!warn @user &lt;reason&gt;</code> - Warn a member</li>
+                    <li><code>!warnings @user</code> - View warnings for a member</li>
+                    <li><code>!clearwarnings @user</code> - Clear all warnings (Admin only)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

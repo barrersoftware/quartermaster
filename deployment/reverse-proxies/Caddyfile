@@ -1,0 +1,12 @@
+bot.yourdomain.com {
+    # Automatic HTTPS with Let's Encrypt
+    
+    # Reverse proxy to Node.js app
+    reverse_proxy localhost:4050
+    
+    # Logging
+    log {
+        output file /var/log/caddy/quartermaster-access.log
+        format json
+    }
+}

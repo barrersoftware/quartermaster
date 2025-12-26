@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Commands - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Custom Commands</span>
+            </div>
+
+            <h1>Custom Commands</h1>
+
+            <div class="settings-section">
+                <h2>Add New Command</h2>
+                <form id="addCommandForm">
+                    <div class="form-group">
+                        <label>Command Name</label>
+                        <input type="text" name="commandName" placeholder="rules" required>
+                        <small>Users will use !commandname</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Response</label>
+                        <textarea name="response" rows="3" placeholder="Welcome! Please read our rules..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Command</button>
+                </form>
+            </div>
+
+            <div class="settings-section">
+                <h2>Existing Commands (<%= commands.length %>)</h2>
+
+                <% if (commands.length === 0) { %>
+                    <div class="empty-state">
+                        <p>No custom commands yet. Create one above!</p>
+                    </div>
+                <% } else { %>
+                    <div class="commands-list">
+                        <% commands.forEach(cmd => { %>
+                            <div class="command-item">
+                                <div class="command-header">
+                                    <h3>!<%= cmd.command_name %></h3>
+                                    <button class="btn btn-small btn-danger" onclick="deleteCommand('<%= cmd.command_name %>')">Delete</button>
+                                </div>
+                                <p class="command-response"><%= cmd.response %></p>
+                                <small>Created by &lt;@<%= cmd.created_by %>&gt; on <%= new Date(cmd.created_at * 1000).toLocaleDateString() %></small>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        // Add command
+        document.getElementById('addCommandForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            const response = await fetch(`/api/server/${guildId}/commands`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    commandName: formData.get('commandName'),
+                    response: formData.get('response')
+                })
+            });
+
+            const data = await response.json();
+            showNotification(data.message || data.error, response.ok ? 'success' : 'error');
+
+            if (response.ok) {
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+
+        // Delete command
+        async function deleteCommand(commandName) {
+            if (!confirm(`Delete command !${commandName}?`)) return;
+
+            const response = await fetch(`/api/server/${guildId}/commands/${commandName}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            showNotification(data.message || data.error, response.ok ? 'success' : 'error');
+
+            if (response.ok) {
+                setTimeout(() => location.reload(), 1000);
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
