@@ -1,0 +1,162 @@
+{
+  "Meta": {
+    "DisplayName": "Quartermaster Discord Bot",
+    "Description": "The ONE Discord bot you need. Free forever. Complete server management, leveling, moderation, AI chat, and web dashboard.",
+    "Author": "BarrerSoftware",
+    "URL": "https://github.com/barrersoftware/quartermaster",
+    "MinAMPVersion": "2.5.0.0",
+    "SpecificDockerImage": "",
+    "DockerRequired": false,
+    "ContainerPolicy": "SupportedOnHost",
+    "Prerequsites": [],
+    "ExtraSetupStepsURI": "",
+    "ConfigManifestChecksum": ""
+  },
+  "ConfigRoot": "quartermaster",
+  "ConfigPath": ".",
+  "WorkingDirectory": ".",
+  "SettingsManifest": [
+    {
+      "DisplayName": "Discord Bot Token",
+      "Category": "Discord Settings:settings",
+      "Description": "Your Discord bot token from https://discord.com/developers/applications",
+      "Keywords": "discord token bot",
+      "FieldName": "DISCORD_TOKEN",
+      "InputType": "password",
+      "IsFlagArgument": false,
+      "ParamFieldName": "DISCORD_TOKEN",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "your_bot_token_here",
+      "EnumValues": {}
+    },
+    {
+      "DisplayName": "Command Prefix",
+      "Category": "Discord Settings:settings",
+      "Description": "The prefix for bot commands (e.g., ! for !help)",
+      "Keywords": "command prefix",
+      "FieldName": "PREFIX",
+      "InputType": "text",
+      "IsFlagArgument": false,
+      "ParamFieldName": "PREFIX",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "!",
+      "EnumValues": {}
+    },
+    {
+      "DisplayName": "Discord Client ID",
+      "Category": "Web Dashboard:dashboard",
+      "Description": "Your Discord application client ID for OAuth2",
+      "Keywords": "discord client id oauth",
+      "FieldName": "CLIENT_ID",
+      "InputType": "text",
+      "IsFlagArgument": false,
+      "ParamFieldName": "CLIENT_ID",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "your_client_id_here",
+      "EnumValues": {}
+    },
+    {
+      "DisplayName": "Discord Client Secret",
+      "Category": "Web Dashboard:dashboard",
+      "Description": "Your Discord application client secret for OAuth2",
+      "Keywords": "discord client secret oauth",
+      "FieldName": "CLIENT_SECRET",
+      "InputType": "password",
+      "IsFlagArgument": false,
+      "ParamFieldName": "CLIENT_SECRET",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "your_client_secret_here",
+      "EnumValues": {}
+    },
+    {
+      "DisplayName": "Dashboard URL",
+      "Category": "Web Dashboard:dashboard",
+      "Description": "The public URL where your dashboard will be accessible (e.g., https://bot.yourdomain.com)",
+      "Keywords": "dashboard url domain",
+      "FieldName": "DASHBOARD_URL",
+      "InputType": "url",
+      "IsFlagArgument": false,
+      "ParamFieldName": "DASHBOARD_URL",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "http://localhost:4050",
+      "EnumValues": {}
+    },
+    {
+      "DisplayName": "Callback URL",
+      "Category": "Web Dashboard:dashboard",
+      "Description": "OAuth2 callback URL (must match Discord app settings)",
+      "Keywords": "callback oauth redirect",
+      "FieldName": "CALLBACK_URL",
+      "InputType": "url",
+      "IsFlagArgument": false,
+      "ParamFieldName": "CALLBACK_URL",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "http://localhost:4050/callback",
+      "EnumValues": {}
+    },
+    {
+      "DisplayName": "Dashboard Port",
+      "Category": "Web Dashboard:dashboard",
+      "Description": "Port for the web dashboard (default: 4050)",
+      "Keywords": "port web",
+      "FieldName": "$ApplicationPort1",
+      "InputType": "number",
+      "IsFlagArgument": false,
+      "ParamFieldName": "PORT",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "4050",
+      "EnumValues": {},
+      "MinValue": 1024,
+      "MaxValue": 65535
+    },
+    {
+      "DisplayName": "Session Secret",
+      "Category": "Web Dashboard:dashboard",
+      "Description": "Random secret for session encryption (auto-generated if empty)",
+      "Keywords": "session secret encryption",
+      "FieldName": "SESSION_SECRET",
+      "InputType": "RandomPassword",
+      "IsFlagArgument": false,
+      "ParamFieldName": "SESSION_SECRET",
+      "IncludeInCommandLine": false,
+      "DefaultValue": "",
+      "EnumValues": {}
+    }
+  ],
+  "PortMappings": [
+    {
+      "Protocol": "TCP",
+      "Port": 4050,
+      "Name": "Web Dashboard",
+      "Description": "Web dashboard interface"
+    }
+  ],
+  "ConsoleEntryStateFormat": "Console{0}",
+  "ConsoleTheme": "ANSIColor",
+  "UpdateSources": [
+    {
+      "UpdateStageName": "Update Bot Files",
+      "UpdateSourcePlatform": "All",
+      "UpdateSource": "FetchGitRepo",
+      "UpdateSourceData": "https://github.com/barrersoftware/quartermaster",
+      "UpdateSourceTarget": "{{$FullRootDir}}"
+    },
+    {
+      "UpdateStageName": "Install Dependencies",
+      "UpdateSourcePlatform": "All",
+      "UpdateSource": "Executable",
+      "UpdateSourceArgs": "install",
+      "UpdateSourceData": "/usr/bin/npm"
+    }
+  ],
+  "AppStart": {
+    "Executable": "/usr/bin/node",
+    "Arguments": "index.js",
+    "SupportsLiveSettingsChanges": false,
+    "EnvironmentVariables": {
+      "NODE_ENV": "production"
+    },
+    "LinuxExecutable": "/usr/bin/node",
+    "MacExecutable": "/usr/bin/node"
+  }
+}
