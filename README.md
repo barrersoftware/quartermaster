@@ -63,6 +63,17 @@ Quartermaster is a complete, free, open-source Discord server management bot tha
 - Server configuration
 - User leaderboards
 
+### 📸 Screenshots
+
+![Dashboard Homepage](screenshots/screenshot.1.png)
+*Dashboard overview with server stats and quick actions*
+
+![Leaderboard View](screenshots/screenshot.2.png)
+*Beautiful leaderboard showing top members*
+
+![Configuration Panel](screenshots/screenshot.3.png)
+*Easy configuration for all features*
+
 ### 💰 Cost Comparison
 
 | Feature | MEE6 | Dyno | Quartermaster |
