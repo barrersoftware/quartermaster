@@ -1,0 +1,126 @@
+{
+    "_comment": "Pterodactyl Egg for Quartermaster Discord Bot",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2025-12-26T23:00:00+00:00",
+    "name": "Quartermaster Discord Bot",
+    "author": "legal@barrersoftware.com",
+    "description": "The ONE Discord bot you need. Free forever. Complete server management, leveling, moderation, AI chat, and web dashboard. Replaces MEE6, Dyno, and every paid bot service.",
+    "features": [
+        "eula"
+    ],
+    "docker_images": {
+        "ghcr.io/parkervcp/yolks:nodejs_18": "ghcr.io/parkervcp/yolks:nodejs_18",
+        "ghcr.io/parkervcp/yolks:nodejs_20": "ghcr.io/parkervcp/yolks:nodejs_20",
+        "ghcr.io/parkervcp/yolks:nodejs_21": "ghcr.io/parkervcp/yolks:nodejs_21"
+    },
+    "file_denylist": [],
+    "startup": "if [[ -d .git ]] && [[ {{AUTO_UPDATE}} == \"1\" ]]; then git pull; fi; if [[ ! -f bot.db ]]; then echo \"Database will be created on first run\"; fi; /usr/local/bin/npm install --production && /usr/local/bin/node index.js",
+    "config": {
+        "files": "{\n    \".env\": {\n        \"parser\": \"properties\",\n        \"find\": {\n            \"DISCORD_TOKEN\": \"DISCORD_TOKEN={{server.build.env.DISCORD_TOKEN}}\",\n            \"PREFIX\": \"PREFIX={{server.build.env.PREFIX}}\",\n            \"CLIENT_ID\": \"CLIENT_ID={{server.build.env.CLIENT_ID}}\",\n            \"CLIENT_SECRET\": \"CLIENT_SECRET={{server.build.env.CLIENT_SECRET}}\",\n            \"CALLBACK_URL\": \"CALLBACK_URL={{server.build.env.CALLBACK_URL}}\",\n            \"DASHBOARD_URL\": \"DASHBOARD_URL={{server.build.env.DASHBOARD_URL}}\",\n            \"PORT\": \"PORT={{server.build.default.port}}\",\n            \"SESSION_SECRET\": \"SESSION_SECRET={{server.build.env.SESSION_SECRET}}\"\n        }\n    }\n}",
+        "startup": "{\n    \"done\": \"Bot is ready and serving\"\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# Quartermaster Installation Script\n\ncd /mnt/server\n\nif [ \"${USER_UPLOAD}\" == \"true\" ] || [ \"${USER_UPLOAD}\" == \"1\" ]; then\n    echo -e \"Assuming user uploaded files...\"\n    if [ ! -f package.json ]; then\n        echo -e \"Missing package.json! Please upload the bot files.\"\n        exit 2\n    fi\nelse\n    echo -e \"Cloning Quartermaster from GitHub...\"\n    \n    if [ -d .git ]; then\n        echo -e \"Updating existing installation...\"\n        git pull\n    else\n        echo -e \"Fresh installation...\"\n        git clone https://github.com/barrersoftware/quartermaster.git .\n    fi\nfi\n\necho -e \"Installing dependencies...\"\nnpm install --production\n\nif [ ! -f .env ]; then\n    echo -e \"Creating .env file from example...\"\n    cp .env.example .env\n    echo -e \"Please configure your .env file with Discord bot token!\"\nfi\n\necho -e \"Installation complete!\"",
+            "container": "ghcr.io/parkervcp/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Discord Bot Token",
+            "description": "Your Discord bot token from https://discord.com/developers/applications",
+            "env_variable": "DISCORD_TOKEN",
+            "default_value": "your_bot_token_here",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Command Prefix",
+            "description": "The prefix for bot commands (e.g., ! for !help)",
+            "env_variable": "PREFIX",
+            "default_value": "!",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:5",
+            "field_type": "text"
+        },
+        {
+            "name": "Discord Client ID",
+            "description": "Your Discord application client ID for OAuth2 (web dashboard)",
+            "env_variable": "CLIENT_ID",
+            "default_value": "your_client_id_here",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Discord Client Secret",
+            "description": "Your Discord application client secret for OAuth2 (web dashboard)",
+            "env_variable": "CLIENT_SECRET",
+            "default_value": "your_client_secret_here",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Dashboard URL",
+            "description": "The public URL where your dashboard will be accessible (e.g., https://bot.yourdomain.com)",
+            "env_variable": "DASHBOARD_URL",
+            "default_value": "http://localhost:4050",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Callback URL",
+            "description": "OAuth2 callback URL (must match Discord app settings and DASHBOARD_URL + /callback)",
+            "env_variable": "CALLBACK_URL",
+            "default_value": "http://localhost:4050/callback",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Session Secret",
+            "description": "Random secret for session encryption (generate with: openssl rand -base64 32)",
+            "env_variable": "SESSION_SECRET",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto Update",
+            "description": "Pull latest changes from GitHub on restart (1 = enabled, 0 = disabled)",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "User Upload",
+            "description": "Set to 1 if you're uploading your own files instead of using Git",
+            "env_variable": "USER_UPLOAD",
+            "default_value": "0",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|boolean",
+            "field_type": "text"
+        }
+    ]
+}
