@@ -1,0 +1,45 @@
+{
+  "name": "Quartermaster",
+  "short_name": "Quartermaster",
+  "description": "The ONE Discord bot you need. Free forever.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#5865F2",
+  "theme_color": "#5865F2",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "productivity",
+    "utilities",
+    "social"
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View server dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Leaderboard",
+      "short_name": "Leaderboard",
+      "description": "View server leaderboard",
+      "url": "/dashboard/leaderboard",
+      "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
