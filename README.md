@@ -1,5 +1,7 @@
 # 🏴‍☠️ Quartermaster
 
+[![License: BOSL v1.1](https://img.shields.io/badge/License-BOSL_v1.1-blue.svg)](https://barrersoftware.com/foss-license.html)
+
 ## ⚠️ THIS SOFTWARE IS FREE - FOREVER
 
 **READ THIS FIRST:**
