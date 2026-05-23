@@ -516,6 +516,77 @@ router.delete('/server/:guildId/social/:platform/:channel', (req, res) => {
     }
 });
 
+// Add shop item
+router.post('/server/:guildId/economy/shop', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { name, description, price, role_id } = req.body;
+    if (!name || !price) return res.status(400).json({ error: 'Missing name or price' });
+
+    try {
+        db.addShopItem.run(guildId, name, description || '', parseInt(price), role_id || null);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add shop item' });
+    }
+});
+
+// Delete shop item
+router.delete('/server/:guildId/economy/shop/:id', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { id } = req.params;
+
+    try {
+        db.deleteShopItem.run(guildId, parseInt(id));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove shop item' });
+    }
+});
+
+// Send custom embed
+router.post('/server/:guildId/embed/send', async (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { channelId, title, description, color, image, thumbnail, footer } = req.body;
+    if (!channelId || !description) return res.status(400).json({ error: 'Missing fields' });
+
+    try {
+        const guild = await client.guilds.fetch(guildId);
+        const channel = await guild.channels.fetch(channelId);
+
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setColor(color || '#5865F2')
+            .setDescription(description);
+
+        if (title) embed.setTitle(title);
+        if (image) embed.setImage(image);
+        if (thumbnail) embed.setThumbnail(thumbnail);
+        if (footer) embed.setFooter({ text: footer });
+
+        await channel.send({ embeds: [embed] });
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to send embed: ' + error.message });
+    }
+});
+
 // Add reaction role
 router.post('/server/:guildId/reaction-roles', (req, res) => {
     const guildId = req.params.guildId;

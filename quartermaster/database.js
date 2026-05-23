@@ -4,15 +4,62 @@ const db = new Database('bot.db');
 // Initialize database tables
 function initDatabase() {
     console.log('Initializing database...');
-    // Users table for leveling system
+    // Users table for leveling system and economy
     db.exec(`
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT NOT NULL,
             guild_id TEXT NOT NULL,
             xp INTEGER DEFAULT 0,
             level INTEGER DEFAULT 0,
+            gold INTEGER DEFAULT 0,
             last_message INTEGER DEFAULT 0,
+            last_daily INTEGER DEFAULT 0,
             PRIMARY KEY (user_id, guild_id)
+        )
+    `);
+
+    // Migration: Add gold and last_daily if they don't exist
+    try {
+        db.exec("ALTER TABLE users ADD COLUMN gold INTEGER DEFAULT 0");
+    } catch (e) { /* Column already exists */ }
+    try {
+        db.exec("ALTER TABLE users ADD COLUMN last_daily INTEGER DEFAULT 0");
+    } catch (e) { /* Column already exists */ }
+
+    // Shop items table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS shop_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            price INTEGER NOT NULL,
+            role_id TEXT, -- If this item gives a role
+            UNIQUE(guild_id, name)
+        )
+    `);
+
+    // Inventory table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            guild_id TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
+            purchased_at INTEGER DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (item_id) REFERENCES shop_items(id)
+        )
+    `);
+
+    // Permanent Log storage
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            type TEXT NOT NULL,
+            user_id TEXT,
+            content TEXT,
+            timestamp INTEGER DEFAULT (strftime('%s', 'now'))
         )
     `);
 
@@ -256,8 +303,11 @@ function addXP(userId, guildId, xp) {
     const newXP = user.xp + xp;
     const newLevel = calculateLevel(newXP);
     const leveledUp = newLevel > user.level;
+    
+    // Also award small amount of gold (10% of XP)
+    const goldGain = Math.ceil(xp * 0.1);
 
-    updateUserXP.run(newXP, newLevel, Date.now(), userId, guildId);
+    db.prepare('UPDATE users SET xp = ?, level = ?, gold = gold + ?, last_message = ? WHERE user_id = ? AND guild_id = ?').run(newXP, newLevel, goldGain, Date.now(), userId, guildId);
 
     return { leveledUp, newLevel, newXP };
 }
@@ -353,6 +403,22 @@ const getAllSocialAlerts = db.prepare('SELECT * FROM social_alerts');
 const addSocialAlert = db.prepare('INSERT OR REPLACE INTO social_alerts (guild_id, platform, channel_name, alert_channel_id) VALUES (?, ?, ?, ?)');
 const deleteSocialAlert = db.prepare('DELETE FROM social_alerts WHERE guild_id = ? AND platform = ? AND channel_name = ?');
 const updateLastNotified = db.prepare('UPDATE social_alerts SET last_notified_id = ? WHERE id = ?');
+
+// Economy functions
+const addGold = db.prepare('UPDATE users SET gold = gold + ? WHERE user_id = ? AND guild_id = ?');
+const setGold = db.prepare('UPDATE users SET gold = ? WHERE user_id = ? AND guild_id = ?');
+const getGold = db.prepare('SELECT gold FROM users WHERE user_id = ? AND guild_id = ?');
+const updateLastDaily = db.prepare('UPDATE users SET last_daily = ? WHERE user_id = ? AND guild_id = ?');
+
+// Shop functions
+const getShopItems = db.prepare('SELECT * FROM shop_items WHERE guild_id = ?');
+const addShopItem = db.prepare('INSERT INTO shop_items (guild_id, name, description, price, role_id) VALUES (?, ?, ?, ?, ?)');
+const deleteShopItem = db.prepare('DELETE FROM shop_items WHERE guild_id = ? AND id = ?');
+const getShopItem = db.prepare('SELECT * FROM shop_items WHERE id = ?');
+
+// Audit Log functions
+const addAuditLog = db.prepare('INSERT INTO audit_logs (guild_id, type, user_id, content) VALUES (?, ?, ?, ?)');
+const getAuditLogs = db.prepare('SELECT * FROM audit_logs WHERE guild_id = ? ORDER BY timestamp DESC LIMIT ?');
 
 function getGuildSettingsOrDefault(guildId) {
     let settings = getGuildSettings.get(guildId);
@@ -478,5 +544,15 @@ module.exports = {
     getAllSocialAlerts,
     addSocialAlert,
     deleteSocialAlert,
-    updateLastNotified
+    updateLastNotified,
+    addGold,
+    setGold,
+    getGold,
+    updateLastDaily,
+    getShopItems,
+    addShopItem,
+    deleteShopItem,
+    getShopItem,
+    addAuditLog,
+    getAuditLogs
 };

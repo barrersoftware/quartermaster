@@ -230,6 +230,50 @@ router.get('/server/:guildId/social', (req, res) => {
     });
 });
 
+// Economy & Shop
+router.get('/server/:guildId/economy', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const roles = Array.from(guild.roles.cache.values())
+        .filter(role => role.name !== '@everyone')
+        .sort((a, b) => b.position - a.position);
+
+    const shopItems = db.getShopItems.all(guildId);
+
+    res.render('dashboard/economy', {
+        user: req.user,
+        guild: guild,
+        roles: roles,
+        shopItems: shopItems
+    });
+});
+
+// Embed Builder
+router.get('/server/:guildId/embed', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const channels = Array.from(guild.channels.cache.values())
+        .filter(channel => channel.type === 0);
+
+    res.render('dashboard/embed', {
+        user: req.user,
+        guild: guild,
+        channels: channels
+    });
+});
+
 // Welcome settings
 router.get('/server/:guildId/welcome', (req, res) => {
     const guildId = req.params.guildId;
@@ -331,6 +375,25 @@ router.get('/server/:guildId/permissions', (req, res) => {
         guild: guild,
         roles: roles,
         settings: settings
+    });
+});
+
+// Audit Logs view
+router.get('/server/:guildId/logs', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const logs = db.getAuditLogs.all(guildId, 100);
+
+    res.render('dashboard/logs', {
+        user: req.user,
+        guild: guild,
+        logs: logs
     });
 });
 

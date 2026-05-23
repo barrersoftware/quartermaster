@@ -11,8 +11,47 @@ class QuartermasterManager {
     start() {
         setInterval(() => {
             this.checkGiveaways();
-            // this.checkSocialAlerts(); // Would require API keys
+            this.rewardVoiceActivity();
         }, this.checkInterval);
+    }
+
+    async rewardVoiceActivity() {
+        try {
+            const guilds = this.client.guilds.cache;
+            for (const [guildId, guild] of guilds) {
+                const config = this.client.config;
+                if (!config.leveling.enabled) continue;
+
+                // Award 10-20 XP per minute in voice
+                const xpPerMinute = 15;
+                const goldPerMinute = 2;
+
+                const voiceStates = guild.voiceStates.cache;
+                for (const [userId, state] of voiceStates) {
+                    // Ignore bots, AFK, and muted users (encourages active participation)
+                    if (state.member.user.bot) continue;
+                    if (state.channelId && !state.selfDeaf && !state.deaf) {
+                        
+                        // Add XP
+                        const result = db.addXP(userId, guildId, xpPerMinute);
+                        
+                        // Add Gold
+                        db.addGold.run(goldPerMinute, userId, guildId);
+
+                        if (result.leveledUp) {
+                            const levelUpMsg = config.leveling.levelUpMessage
+                                .replace('{user}', `<@${userId}>`)
+                                .replace('{level}', result.newLevel);
+                            
+                            const channel = guild.systemChannel || guild.channels.cache.find(c => c.type === 0);
+                            if (channel) await channel.send(`🎙️ **Voice Active:** ${levelUpMsg}`);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Voice XP Error:', error);
+        }
     }
 
     async checkGiveaways() {

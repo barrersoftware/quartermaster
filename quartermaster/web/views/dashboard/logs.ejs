@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Audit Logs</span>
+            </div>
+
+            <h1>Web Audit Log Viewer</h1>
+            <p>A searchable history of all server events and moderator actions.</p>
+
+            <div class="settings-section">
+                <div class="log-filters">
+                    <!-- Filters could be added here in the future -->
+                    <button class="btn btn-secondary" onclick="location.reload()">Refresh Logs</button>
+                </div>
+
+                <div class="logs-table-wrapper">
+                    <table class="table logs-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>User</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (logs.length === 0) { %>
+                                <tr>
+                                    <td colspan="4" class="text-center">No logs found in the database.</td>
+                                </tr>
+                            <% } else { %>
+                                <% logs.forEach(log => { 
+                                    const typeClass = log.type.startsWith('MOD_') ? 'badge-danger' : 
+                                                     log.type.startsWith('MSG_') ? 'badge-info' : 'badge-secondary';
+                                %>
+                                    <tr>
+                                        <td class="log-time"><%= new Date(log.timestamp * 1000).toLocaleString() %></td>
+                                        <td><span class="badge <%= typeClass %>"><%= log.type %></span></td>
+                                        <td>
+                                            <% if (log.user_id) { %>
+                                                <code><%= log.user_id %></code>
+                                            <% } else { %>
+                                                <span class="muted">System</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="log-details">
+                                            <div class="log-content-preview"><%= log.content || 'N/A' %></div>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Economy & Shop - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Economy & Shop</span>
+            </div>
+
+            <h1>Ship's Stores (Economy & Shop)</h1>
+            <p>Manage the server currency and items members can buy with Pirate Gold.</p>
+
+            <div class="settings-grid">
+                <div class="settings-section">
+                    <h2>Shop Items</h2>
+                    <div class="shop-list">
+                        <% if (shopItems.length === 0) { %>
+                            <p class="muted">The shop is currently empty.</p>
+                        <% } else { %>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Item Name</th>
+                                        <th>Price</th>
+                                        <th>Role Reward</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% shopItems.forEach(item => { %>
+                                        <tr>
+                                            <td><strong><%= item.name %></strong><br><small><%= item.description %></small></td>
+                                            <td>💰 <%= item.price.toLocaleString() %></td>
+                                            <td>
+                                                <% if (item.role_id) { 
+                                                    const role = roles.find(r => r.id === item.role_id); %>
+                                                    <span class="role-badge" style="background-color: <%= role ? role.hexColor : '#99AAB5' %>">
+                                                        @<%= role ? role.name : item.role_id %>
+                                                    </span>
+                                                <% } else { %>
+                                                    <span class="muted">None</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-small btn-danger" onclick="deleteItem(<%= item.id %>)">Remove</button>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Add New Item</h2>
+                    <form id="addItemForm">
+                        <div class="form-group">
+                            <label>Item Name</label>
+                            <input type="text" name="name" class="input-field" placeholder="e.g. VIP Member" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" name="description" class="input-field" placeholder="What does this item do?">
+                        </div>
+                        <div class="form-group">
+                            <label>Price (Pirate Gold)</label>
+                            <input type="number" name="price" class="input-field" value="1000" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Role to Award (Optional)</label>
+                            <select name="role_id" class="input-select">
+                                <option value="">None</option>
+                                <% roles.forEach(role => { %>
+                                    <option value="<%= role.id %>">@<%= role.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add to Shop</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/economy/shop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        async function deleteItem(id) {
+            if (!confirm('Remove this item from the shop?')) return;
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/economy/shop/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,12 +1,15 @@
 const { EmbedBuilder } = require('discord.js');
 const db = require('./database');
 
-async function sendLog(guild, embed) {
+async function sendLog(guild, embed, type, userId, content) {
     try {
-        const settings = db.getGuildSettings.get(guild.id);
+        // Save to database
+        db.addAuditLog.run(guild.id, type, userId || null, content || null);
+
+        const settings = db.getGuildSettingsOrDefault(guild.id);
         if (!settings || !settings.log_channel) return;
 
-        const logChannel = guild.channels.cache.find(ch => ch.name === settings.log_channel || ch.id === settings.log_channel);
+        const logChannel = guild.channels.cache.get(settings.log_channel) || guild.channels.cache.find(ch => ch.name === settings.log_channel);
         if (logChannel) {
             await logChannel.send({ embeds: [embed] });
         }
@@ -27,7 +30,7 @@ module.exports = {
             )
             .setTimestamp();
         
-        await sendLog(guild, embed);
+        await sendLog(guild, embed, `MOD_${action}`, target.id, reason);
     },
 
     logMessageDelete: async (message) => {
@@ -44,7 +47,7 @@ module.exports = {
             )
             .setTimestamp();
         
-        await sendLog(message.guild, embed);
+        await sendLog(message.guild, embed, 'MSG_DELETE', message.author.id, message.content);
     },
 
     logMessageUpdate: async (oldMessage, newMessage) => {
@@ -62,7 +65,7 @@ module.exports = {
             )
             .setTimestamp();
         
-        await sendLog(oldMessage.guild, embed);
+        await sendLog(oldMessage.guild, embed, 'MSG_UPDATE', oldMessage.author.id, `BEFORE: ${oldMessage.content}\nAFTER: ${newMessage.content}`);
     },
 
     logGuildMemberUpdate: async (oldMember, newMember) => {

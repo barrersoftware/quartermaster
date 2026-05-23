@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embed Builder - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Embed Builder</span>
+            </div>
+
+            <h1>Visual Embed Builder</h1>
+            <p>Design a beautiful announcement and send it directly to your server.</p>
+
+            <div class="settings-grid">
+                <div class="settings-section">
+                    <h2>Editor</h2>
+                    <form id="embedForm">
+                        <div class="form-group">
+                            <label>Target Channel</label>
+                            <select name="channelId" class="input-select" required>
+                                <% channels.forEach(ch => { %>
+                                    <option value="<%= ch.id %>">#<%= ch.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" id="ebTitle" name="title" class="input-field" placeholder="Embed Title">
+                        </div>
+                        <div class="form-group">
+                            <label>Description (Markdown supported)</label>
+                            <textarea id="ebDesc" name="description" rows="5" class="input-field" placeholder="Your main message content..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Color</label>
+                            <input type="color" id="ebColor" name="color" value="#5865F2" class="input-color">
+                        </div>
+                        <div class="form-group">
+                            <label>Image URL</label>
+                            <input type="text" id="ebImage" name="image" class="input-field" placeholder="https://example.com/hero.png">
+                        </div>
+                        <div class="form-group">
+                            <label>Thumbnail URL</label>
+                            <input type="text" id="ebThumb" name="thumbnail" class="input-field" placeholder="https://example.com/icon.png">
+                        </div>
+                        <div class="form-group">
+                            <label>Footer Text</label>
+                            <input type="text" id="ebFooter" name="footer" class="input-field" placeholder="Small text at the bottom">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-large">Send Embed to Discord</button>
+                    </form>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Live Preview</h2>
+                    <div id="embedPreview" class="discord-embed-preview" style="border-left-color: #5865F2;">
+                        <div class="preview-content">
+                            <div id="previewTitle" class="preview-title">Title Preview</div>
+                            <div id="previewDesc" class="preview-description">Description will appear here. Markdown is simulated.</div>
+                            <img id="previewImage" src="" class="preview-image hidden">
+                            <div id="previewFooter" class="preview-footer">Footer text</div>
+                        </div>
+                        <img id="previewThumb" src="" class="preview-thumbnail hidden">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        // Live Preview Logic
+        const inputs = ['ebTitle', 'ebDesc', 'ebColor', 'ebImage', 'ebThumb', 'ebFooter'];
+        const previewMap = {
+            'ebTitle': 'previewTitle',
+            'ebDesc': 'previewDesc',
+            'ebFooter': 'previewFooter'
+        };
+
+        function updatePreview() {
+            // Update Text
+            for (const [inputId, previewId] of Object.entries(previewMap)) {
+                document.getElementById(previewId).textContent = document.getElementById(inputId).value || (inputId === 'ebTitle' ? '' : '...');
+            }
+
+            // Update Color
+            document.getElementById('embedPreview').style.borderLeftColor = document.getElementById('ebColor').value;
+
+            // Update Images
+            const imgUrl = document.getElementById('ebImage').value;
+            const thumbUrl = document.getElementById('ebThumb').value;
+            
+            const previewImg = document.getElementById('previewImage');
+            if (imgUrl) { previewImg.src = imgUrl; previewImg.classList.remove('hidden'); }
+            else { previewImg.classList.add('hidden'); }
+
+            const previewThumb = document.getElementById('previewThumb');
+            if (thumbUrl) { previewThumb.src = thumbUrl; previewThumb.classList.remove('hidden'); }
+            else { previewThumb.classList.add('hidden'); }
+        }
+
+        inputs.forEach(id => document.getElementById(id).addEventListener('input', updatePreview));
+
+        // Submit Form
+        document.getElementById('embedForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            if (!confirm(`Are you sure you want to send this embed to the selected channel?`)) return;
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/embed/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) alert('Embed sent successfully!');
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+                alert('Failed to send embed');
+            }
+        });
+    </script>
+</body>
+</html>
