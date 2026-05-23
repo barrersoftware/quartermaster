@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const db = require('../../database');
 
 module.exports = {
@@ -6,14 +6,27 @@ module.exports = {
     aliases: ['lb', 'top'],
     description: 'View the server leaderboard',
     usage: '!leaderboard [limit]',
-    async execute(message, args) {
-        const limit = parseInt(args[0]) || 10;
+    data: new SlashCommandBuilder()
+        .setName('leaderboard')
+        .setDescription('View the server leaderboard')
+        .addIntegerOption(option => 
+            option.setName('limit')
+                .setDescription('Number of users to show (max 25)')
+                .setRequired(false)),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const limit = isInteraction ? 
+            (interaction.options.getInteger('limit') || 10) : 
+            (parseInt(args[0]) || 10);
+            
         const maxLimit = Math.min(limit, 25);
+        const guildId = interaction.guild.id;
 
-        const leaderboard = db.getLeaderboard.all(message.guild.id, maxLimit);
+        const leaderboard = db.getLeaderboard.all(guildId, maxLimit);
 
         if (!leaderboard || leaderboard.length === 0) {
-            return message.reply('No one has earned XP yet!');
+            const msg = 'No one has earned XP yet!';
+            return isInteraction ? interaction.reply(msg) : interaction.reply(msg);
         }
 
         let description = '';
@@ -27,11 +40,15 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor('#FFD700')
-            .setTitle(`${message.guild.name} Leaderboard`)
+            .setTitle(`${interaction.guild.name} Leaderboard`)
             .setDescription(description)
             .setFooter({ text: `Showing top ${leaderboard.length} members` })
             .setTimestamp();
 
-        await message.channel.send({ embeds: [embed] });
+        if (isInteraction) {
+            await interaction.reply({ embeds: [embed] });
+        } else {
+            await interaction.channel.send({ embeds: [embed] });
+        }
     }
 };

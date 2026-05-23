@@ -58,7 +58,70 @@
             </div>
 
             <div class="settings-section">
-                <h2>Role Rewards</h2>
+                <h2>Visual Customization</h2>
+                <p>Customize how rank cards look in your server</p>
+                <form id="visualForm">
+                    <div class="form-group">
+                        <label>Progress Bar Color</label>
+                        <div class="color-picker-group">
+                            <input type="color" name="rank_card_color" value="<%= settings.rank_card_color || '#5865F2' %>" class="color-input">
+                            <input type="text" id="colorText" value="<%= settings.rank_card_color || '#5865F2' %>" class="input-field" style="width: 100px;">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Visuals</button>
+                </form>
+            </div>
+
+            <div class="settings-section">
+                <h2>XP Multipliers</h2>
+                <p>Give extra XP for specific roles or channels (e.g., 2.0 for double XP)</p>
+
+                <div class="multipliers-list">
+                    <% if (multipliers.length === 0) { %>
+                        <p class="muted">No multipliers configured.</p>
+                    <% } else { %>
+                        <% multipliers.forEach(m => { %>
+                            <div class="multiplier-item">
+                                <span class="type-badge <%= m.type %>"><%= m.type.toUpperCase() %></span>
+                                <span>
+                                    <% if (m.type === 'role') { 
+                                        const role = roles.find(r => r.id === m.target_id); %>
+                                        <%= role ? role.name : m.target_id %>
+                                    <% } else { 
+                                        const channel = channels.find(c => c.id === m.target_id); %>
+                                        #<%= channel ? channel.name : m.target_id %>
+                                    <% } %>
+                                </span>
+                                <span class="multiplier-value"><%= m.multiplier %>x</span>
+                                <button class="btn btn-small btn-danger" onclick="removeMultiplier('<%= m.target_id %>', '<%= m.type %>')">Remove</button>
+                            </div>
+                        <% }); %>
+                    <% } %>
+                </div>
+
+                <form id="addMultiplierForm" class="form-inline">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select name="type" id="multType" required>
+                            <option value="role">Role</option>
+                            <option value="channel">Channel</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Target</label>
+                        <select name="target_id" id="multTarget" required>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Multiplier</label>
+                        <input type="number" name="multiplier" step="0.1" min="0.1" max="10.0" value="2.0" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Multiplier</button>
+                </form>
+            </div>
+
+            <div class="settings-section">
                 <p>Automatically give roles when members reach certain levels</p>
 
                 <div class="role-rewards-list">
@@ -101,6 +164,70 @@
 
     <script>
         const guildId = '<%= guild.id %>';
+        const roles = <%- JSON.stringify(roles) %>;
+        const channels = <%- JSON.stringify(channels) %>;
+
+        // Populate multiplier targets
+        const multType = document.getElementById('multType');
+        const multTarget = document.getElementById('multTarget');
+
+        function updateMultTargets() {
+            const type = multType.value;
+            multTarget.innerHTML = '';
+            const items = type === 'role' ? roles : channels;
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = item.name;
+                multTarget.appendChild(opt);
+            });
+        }
+
+        multType.addEventListener('change', updateMultTargets);
+        updateMultTargets();
+
+        // Sync color input with text
+        const colorInput = document.querySelector('input[name="rank_card_color"]');
+        const colorText = document.getElementById('colorText');
+        colorInput.addEventListener('input', () => colorText.value = colorInput.value.toUpperCase());
+        colorText.addEventListener('input', () => colorInput.value = colorText.value);
+
+        // Handle visual form
+        document.getElementById('visualForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/settings/visuals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            const data = await response.json();
+            showNotification(data.success ? 'Visuals updated!' : 'Update failed', data.success ? 'success' : 'error');
+        });
+
+        // Handle add multiplier form
+        document.getElementById('addMultiplierForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/leveling/multiplier`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            const data = await response.json();
+            if (data.success) location.reload();
+            else showNotification('Failed to add multiplier', 'error');
+        });
+
+        async function removeMultiplier(targetId, type) {
+            if (!confirm('Remove this multiplier?')) return;
+            const response = await fetch(`/api/server/${guildId}/leveling/multiplier/${type}/${targetId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (data.success) location.reload();
+            else showNotification('Failed to remove multiplier', 'error');
+        }
 
         // Handle leveling form submission
         document.getElementById('levelingForm').addEventListener('submit', async (e) => {

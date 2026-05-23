@@ -132,12 +132,21 @@ router.get('/server/:guildId/leveling', (req, res) => {
     const roles = Array.from(guild.roles.cache.values())
         .filter(role => role.name !== '@everyone')
         .sort((a, b) => b.position - a.position);
+    
+    const channels = Array.from(guild.channels.cache.values())
+        .filter(ch => ch.type === 0);
+
+    const multipliers = db.getMultipliers.all(guildId);
+    const settings = db.getGuildSettingsOrDefault(guildId);
 
     res.render('dashboard/leveling', {
         user: req.user,
         guild: guild,
         config: config,
-        roles: roles
+        roles: roles,
+        channels: channels,
+        multipliers: multipliers,
+        settings: settings
     });
 });
 
@@ -179,7 +188,7 @@ router.get('/server/:guildId/commands', (req, res) => {
     });
 });
 
-// Welcome/Leave settings
+// Welcome settings
 router.get('/server/:guildId/welcome', (req, res) => {
     const guildId = req.params.guildId;
     const client = req.app.locals.client;
@@ -192,13 +201,22 @@ router.get('/server/:guildId/welcome', (req, res) => {
     const channels = Array.from(guild.channels.cache.values())
         .filter(channel => channel.type === 0); // Text channels only
 
+    const roles = Array.from(guild.roles.cache.values())
+        .filter(role => role.name !== '@everyone')
+        .sort((a, b) => b.position - a.position);
+
+    const settings = db.getGuildSettingsOrDefault(guildId);
+
     res.render('dashboard/welcome', {
         user: req.user,
         guild: guild,
         config: config,
-        channels: channels
+        channels: channels,
+        roles: roles,
+        settings: settings
     });
 });
+
 
 // Moderation logs
 router.get('/server/:guildId/moderation', (req, res) => {
@@ -212,11 +230,17 @@ router.get('/server/:guildId/moderation', (req, res) => {
 
     // Get all warnings for this guild
     const allWarnings = db.getWarnings.all('%', guildId);
+    
+    // Get Auto-mod settings and blacklist
+    const automodSettings = db.getAutomodSettingsOrDefault(guildId);
+    const blacklist = db.getBlacklist.all(guildId);
 
     res.render('dashboard/moderation', {
         user: req.user,
         guild: guild,
-        warnings: allWarnings
+        warnings: allWarnings,
+        automod: automodSettings,
+        blacklist: blacklist
     });
 });
 

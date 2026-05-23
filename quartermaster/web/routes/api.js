@@ -178,6 +178,22 @@ router.post('/server/:guildId/welcome', (req, res) => {
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
+    // Update auto_role and visuals in database
+    const settings = db.getGuildSettingsOrDefault(guildId);
+    if (req.body.auto_role !== undefined) {
+        settings.auto_role = req.body.auto_role || null;
+    }
+
+    db.setGuildSetting.run(
+        guildId,
+        settings.welcome_channel,
+        settings.leave_channel,
+        settings.log_channel,
+        settings.mute_role,
+        settings.rank_card_color,
+        settings.auto_role
+    );
+
     res.json({ success: true, message: 'Welcome/Leave settings updated' });
 });
 
@@ -215,6 +231,142 @@ router.post('/server/:guildId/raid', (req, res) => {
     } catch (error) {
         console.error('Error updating raid settings:', error);
         res.status(500).json({ error: 'Failed to update raid settings' });
+    }
+});
+
+// Update auto-mod settings
+router.post('/server/:guildId/automod', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    try {
+        const settings = db.getAutomodSettingsOrDefault(guildId);
+        
+        // Update from body
+        if (req.body.spam_enabled !== undefined) settings.spam_enabled = parseInt(req.body.spam_enabled);
+        if (req.body.spam_threshold !== undefined) settings.spam_threshold = parseInt(req.body.spam_threshold);
+        if (req.body.links_enabled !== undefined) settings.links_enabled = parseInt(req.body.links_enabled);
+        if (req.body.invites_enabled !== undefined) settings.invites_enabled = parseInt(req.body.invites_enabled);
+        if (req.body.badwords_enabled !== undefined) settings.badwords_enabled = parseInt(req.body.badwords_enabled);
+
+        db.setAutomodSettings.run(
+            guildId,
+            settings.spam_enabled,
+            settings.spam_threshold,
+            settings.links_enabled,
+            settings.invites_enabled,
+            settings.badwords_enabled
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update automod' });
+    }
+});
+
+// Add to blacklist
+router.post('/server/:guildId/automod/blacklist', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { word } = req.body;
+    if (!word) return res.status(400).json({ error: 'Missing word' });
+
+    try {
+        db.addBlacklistWord.run(guildId, word.toLowerCase());
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add word' });
+    }
+});
+
+// Remove from blacklist
+router.delete('/server/:guildId/automod/blacklist/:word', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const word = req.params.word;
+
+    try {
+        db.removeBlacklistWord.run(guildId, word);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove word' });
+    }
+});
+
+// Update visual settings
+router.post('/server/:guildId/settings/visuals', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    try {
+        const settings = db.getGuildSettingsOrDefault(guildId);
+        settings.rank_card_color = req.body.rank_card_color || settings.rank_card_color;
+
+        db.setGuildSetting.run(
+            guildId,
+            settings.welcome_channel,
+            settings.leave_channel,
+            settings.log_channel,
+            settings.mute_role,
+            settings.rank_card_color
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update visuals' });
+    }
+});
+
+// Add multiplier
+router.post('/server/:guildId/leveling/multiplier', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { target_id, type, multiplier } = req.body;
+    if (!target_id || !type || !multiplier) return res.status(400).json({ error: 'Missing fields' });
+
+    try {
+        db.addMultiplier.run(guildId, target_id, type, parseFloat(multiplier));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add multiplier' });
+    }
+});
+
+// Remove multiplier
+router.delete('/server/:guildId/leveling/multiplier/:type/:targetId', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { type, targetId } = req.params;
+
+    try {
+        db.deleteMultiplier.run(guildId, targetId, type);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove multiplier' });
     }
 });
 

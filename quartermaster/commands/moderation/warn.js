@@ -1,53 +1,65 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const db = require('../../database');
+const logger = require('../../logger');
 
 module.exports = {
     name: 'warn',
     description: 'Warn a user',
     usage: '!warn @user <reason>',
     permissions: PermissionFlagsBits.ModerateMembers,
-    async execute(message, args) {
-        const user = message.mentions.users.first();
+    data: new SlashCommandBuilder()
+        .setName('warn')
+        .setDescription('Warn a member of the server')
+        .addUserOption(opt => opt.setName('target').setDescription('The user to warn').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason for the warning').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const user = isInteraction ? interaction.options.getUser('target') : interaction.mentions.users.first();
+        const reason = isInteraction ? interaction.options.getString('reason') : args.slice(1).join(' ');
 
-        if (!user) {
-            return message.reply('Please mention a user to warn!');
+        if (!user || !reason) {
+            const msg = 'Usage: `!warn @user <reason>`';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
-        const reason = args.slice(1).join(' ');
-        if (!reason) {
-            return message.reply('Please provide a reason for the warning!');
-        }
+        const guildId = interaction.guild.id;
+        const author = isInteraction ? interaction.user : interaction.author;
 
-        // Prevent self-warn
-        if (user.id === message.author.id) {
-            return message.reply('You cannot warn yourself!');
+        if (user.id === author.id) {
+            const msg = 'You cannot warn yourself!';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
         try {
-            // Add warning to database
-            db.addWarning.run(user.id, message.guild.id, message.author.id, reason);
+            db.addWarning.run(user.id, guildId, author.id, reason);
+            const warnings = db.getWarnings.all(user.id, guildId);
 
-            // Get total warnings
-            const warnings = db.getWarnings.all(user.id, message.guild.id);
+            await logger.logModeration(interaction.guild, 'WARN', author, user, reason);
 
             const embed = new EmbedBuilder()
                 .setColor('#FFFF00')
                 .setTitle('User Warned')
                 .setDescription(`${user.tag} has been warned`)
                 .addFields(
-                    { name: 'Moderator', value: message.author.tag, inline: true },
+                    { name: 'Moderator', value: author.tag, inline: true },
                     { name: 'Total Warnings', value: warnings.length.toString(), inline: true },
                     { name: 'Reason', value: reason, inline: false }
                 )
                 .setTimestamp();
 
-            await message.channel.send({ embeds: [embed] });
+            if (isInteraction) {
+                await interaction.reply({ embeds: [embed] });
+            } else {
+                await interaction.channel.send({ embeds: [embed] });
+            }
 
-            // Send DM to user
-            await user.send(`You have been warned in ${message.guild.name}. Reason: ${reason}\nTotal warnings: ${warnings.length}`).catch(() => {});
+            await user.send(`You have been warned in ${interaction.guild.name}. Reason: ${reason}\nTotal warnings: ${warnings.length}`).catch(() => {});
         } catch (error) {
             console.error('Error warning user:', error);
-            await message.reply('Failed to warn the user!');
+            const errMsg = 'Failed to warn the user!';
+            if (isInteraction) await interaction.reply({ content: errMsg, ephemeral: true });
+            else interaction.reply(errMsg);
         }
     }
 };

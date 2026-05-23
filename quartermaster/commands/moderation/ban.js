@@ -1,55 +1,62 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const logger = require('../../logger');
 
 module.exports = {
     name: 'ban',
     description: 'Ban a user from the server',
     usage: '!ban @user [reason]',
     permissions: PermissionFlagsBits.BanMembers,
-    async execute(message, args) {
-        const user = message.mentions.users.first();
+    data: new SlashCommandBuilder()
+        .setName('ban')
+        .setDescription('Ban a user from the server')
+        .addUserOption(opt => opt.setName('target').setDescription('The user to ban').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason for the ban').setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const user = isInteraction ? interaction.options.getUser('target') : interaction.mentions.users.first();
+        const reason = isInteraction ? (interaction.options.getString('reason') || 'No reason provided') : (args.slice(1).join(' ') || 'No reason provided');
 
         if (!user) {
-            return message.reply('Please mention a user to ban!');
+            return interaction.reply('Please mention a user to ban!');
         }
 
-        const member = message.guild.members.cache.get(user.id);
+        const member = interaction.guild.members.cache.get(user.id);
         if (!member) {
-            return message.reply('User not found in this server!');
+            return interaction.reply('User not found in this server!');
         }
 
-        // Check if user can be banned
         if (!member.bannable) {
-            return message.reply('I cannot ban this user! They may have a higher role than me.');
+            return interaction.reply('I cannot ban this user!');
         }
 
-        // Prevent self-ban
-        if (user.id === message.author.id) {
-            return message.reply('You cannot ban yourself!');
+        if (user.id === (isInteraction ? interaction.user.id : interaction.author.id)) {
+            return interaction.reply('You cannot ban yourself!');
         }
-
-        const reason = args.slice(1).join(' ') || 'No reason provided';
 
         try {
-            // Send DM to user
-            await user.send(`You have been banned from ${message.guild.name}. Reason: ${reason}`).catch(() => {});
-
-            // Ban the user
-            await member.ban({ reason: `${reason} | Banned by ${message.author.tag}` });
+            await user.send(`You have been banned from ${interaction.guild.name}. Reason: ${reason}`).catch(() => {});
+            await member.ban({ reason: `${reason} | Banned by ${isInteraction ? interaction.user.tag : interaction.author.tag}` });
+            await logger.logModeration(interaction.guild, 'BAN', isInteraction ? interaction.user : interaction.author, user, reason);
 
             const embed = new EmbedBuilder()
                 .setColor('#FF0000')
                 .setTitle('User Banned')
                 .setDescription(`${user.tag} has been banned`)
                 .addFields(
-                    { name: 'Moderator', value: message.author.tag, inline: true },
+                    { name: 'Moderator', value: isInteraction ? interaction.user.tag : interaction.author.tag, inline: true },
                     { name: 'Reason', value: reason, inline: true }
                 )
                 .setTimestamp();
 
-            await message.channel.send({ embeds: [embed] });
+            if (isInteraction) {
+                await interaction.reply({ embeds: [embed] });
+            } else {
+                await interaction.channel.send({ embeds: [embed] });
+            }
         } catch (error) {
             console.error('Error banning user:', error);
-            await message.reply('Failed to ban the user!');
+            interaction.reply('Failed to ban the user!');
         }
     }
 };

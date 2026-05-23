@@ -1,4 +1,4 @@
-# MEE6 Clone Discord Bot
+# 🏴‍☠️ Quartermaster
 
 A feature-rich Discord bot inspired by MEE6, built with discord.js and SQLite. Includes leveling system, moderation tools, custom commands, and welcome/leave messages.
 

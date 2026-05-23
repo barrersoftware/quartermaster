@@ -32,6 +32,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Auto-Role (Join Role)</label>
+                        <select name="auto_role">
+                            <option value="">None (Disabled)</option>
+                            <% roles.forEach(role => { %>
+                                <option value="<%= role.id %>" <%= settings.auto_role === role.id ? 'selected' : '' %>>
+                                    @<%= role.name %>
+                                </option>
+                            <% }); %>
+                        </select>
+                        <small>Role given automatically when a member joins.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label>Welcome Channel</label>
                         <select name="welcomeChannel">
                             <% channels.forEach(channel => { %>
@@ -107,6 +120,7 @@
                     welcomeChannel: formData.get('welcomeChannel'),
                     welcomeMessage: formData.get('welcomeMessage'),
                     welcomeColor: formData.get('welcomeColor'),
+                    auto_role: formData.get('auto_role'),
                     leaveEnabled: formData.get('leaveEnabled') === 'on',
                     leaveChannel: formData.get('leaveChannel'),
                     leaveMessage: formData.get('leaveMessage')

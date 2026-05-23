@@ -1,20 +1,34 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'help',
     description: 'Shows all available commands',
     usage: '!help [command]',
-    async execute(message, args, client) {
+    data: new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Shows all available commands')
+        .addStringOption(option => 
+            option.setName('command')
+                .setDescription('The command to get details for')
+                .setRequired(false)),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const client = interaction.client;
         const prefix = process.env.PREFIX || '!';
 
+        const commandNameInput = isInteraction ? 
+            interaction.options.getString('command') : 
+            (args && args.length > 0 ? args[0] : null);
+
         // If a specific command is requested
-        if (args.length > 0) {
-            const commandName = args[0].toLowerCase();
+        if (commandNameInput) {
+            const commandName = commandNameInput.toLowerCase();
             const command = client.commands.get(commandName) ||
                 client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 
             if (!command) {
-                return message.reply('Command not found!');
+                const msg = 'Command not found!';
+                return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
             }
 
             const embed = new EmbedBuilder()
@@ -29,14 +43,14 @@ module.exports = {
                 embed.addFields({ name: 'Aliases', value: command.aliases.join(', '), inline: false });
             }
 
-            return message.channel.send({ embeds: [embed] });
+            return isInteraction ? interaction.reply({ embeds: [embed] }) : interaction.channel.send({ embeds: [embed] });
         }
 
         // Show all commands
         const embed = new EmbedBuilder()
             .setColor('#5865F2')
             .setTitle('Bot Commands')
-            .setDescription(`Use \`${prefix}help <command>\` for detailed information about a specific command.`)
+            .setDescription(`Use \`${prefix}help <command>\` or \`/help <command>\` for detailed information.`)
             .addFields(
                 {
                     name: 'Leveling',
@@ -45,7 +59,7 @@ module.exports = {
                 },
                 {
                     name: 'Moderation',
-                    value: '`ban`, `kick`, `mute`, `unmute`, `warn`, `warnings`, `clearwarnings`',
+                    value: '`ban`, `kick`, `mute`, `warn`, `warnings`, `clearwarnings`, `automod`',
                     inline: false
                 },
                 {
@@ -54,19 +68,18 @@ module.exports = {
                     inline: false
                 },
                 {
-                    name: 'Custom Commands',
-                    value: '`addcommand`, `removecommand`, `listcommands`',
-                    inline: false
-                },
-                {
-                    name: 'Other',
-                    value: '`help`',
+                    name: 'Utility',
+                    value: '`setup-community`, `setup-welcome`, `setup-rules`, `reactionrole`, `embed`',
                     inline: false
                 }
             )
-            .setFooter({ text: `Prefix: ${prefix}` })
+            .setFooter({ text: `Prefix: ${prefix} | MIT License` })
             .setTimestamp();
 
-        await message.channel.send({ embeds: [embed] });
+        if (isInteraction) {
+            await interaction.reply({ embeds: [embed] });
+        } else {
+            await interaction.channel.send({ embeds: [embed] });
+        }
     }
 };

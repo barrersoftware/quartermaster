@@ -1,34 +1,44 @@
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'setup-welcome',
     description: 'Create a custom welcome embed with sections',
     usage: '!setup-welcome #channel',
     permissions: PermissionFlagsBits.ManageGuild,
-    async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-            return message.reply('❌ You need Manage Server permission.');
-        }
+    data: new SlashCommandBuilder()
+        .setName('setup-welcome')
+        .setDescription('Create a custom welcome embed with sections')
+        .addChannelOption(option => 
+            option.setName('channel')
+                .setDescription('The channel to post the welcome embeds in')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const channel = isInteraction ? 
+            interaction.options.getChannel('channel') : 
+            interaction.mentions.channels.first();
 
-        const channel = message.mentions.channels.first();
+        const guild = interaction.guild;
 
         if (!channel) {
-            return message.reply('Usage: `!setup-welcome #channel`\nExample: `!setup-welcome #welcome`');
+            const msg = 'Usage: `!setup-welcome #channel`';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
         // Welcome Embed
         const welcomeEmbed = new EmbedBuilder()
             .setColor('#5865F2')
-            .setTitle(`👋 Welcome to ${message.guild.name}!`)
+            .setTitle(`👋 Welcome to ${guild.name}!`)
             .setDescription('We\'re glad to have you here! Here\'s everything you need to get started.')
-            .setThumbnail(message.guild.iconURL())
+            .setThumbnail(guild.iconURL())
             .addFields(
                 { name: '📜 Read the Rules', value: 'Check out the rules channel and react to accept them.', inline: false },
                 { name: '💬 Introduce Yourself', value: 'Head to the introductions channel and say hi!', inline: false },
                 { name: '🎮 Pick Your Roles', value: 'Visit the roles channel to customize your experience.', inline: false },
                 { name: '🆘 Need Help?', value: 'Ping a moderator or use the support channel.', inline: false }
             )
-            .setFooter({ text: `Member #${message.guild.memberCount}` })
+            .setFooter({ text: `Member #${guild.memberCount}` })
             .setTimestamp();
 
         // Server Info Embed
@@ -36,8 +46,8 @@ module.exports = {
             .setColor('#43B581')
             .setTitle('📊 Server Information')
             .addFields(
-                { name: '👥 Members', value: `${message.guild.memberCount}`, inline: true },
-                { name: '📅 Created', value: `<t:${Math.floor(message.guild.createdTimestamp / 1000)}:R>`, inline: true },
+                { name: '👥 Members', value: `${guild.memberCount}`, inline: true },
+                { name: '📅 Created', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
                 { name: '🏴‍☠️ Bot', value: 'Powered by Quartermaster', inline: true }
             );
 
@@ -63,10 +73,19 @@ module.exports = {
                 .setDescription(`Welcome embeds posted in ${channel}!`)
                 .setTimestamp();
 
-            await message.channel.send({ embeds: [confirmEmbed] });
+            if (isInteraction) {
+                await interaction.reply({ embeds: [confirmEmbed] });
+            } else {
+                await interaction.reply({ embeds: [confirmEmbed] });
+            }
         } catch (error) {
             console.error('Error setting up welcome:', error);
-            message.reply('❌ Failed to setup welcome channel. Make sure I have permission to post in that channel.');
+            const errMsg = '❌ Failed to setup welcome channel. Make sure I have permission to post in that channel.';
+            if (isInteraction) {
+                await interaction.reply({ content: errMsg, ephemeral: true });
+            } else {
+                await interaction.reply(errMsg);
+            }
         }
     }
 };

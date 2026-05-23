@@ -17,7 +17,70 @@
                 <span>Moderation</span>
             </div>
 
-            <h1>Moderation Logs</h1>
+            <h1>Moderation & Auto-Mod</h1>
+
+            <div class="settings-grid">
+                <div class="settings-section">
+                    <h2>Auto-Moderation</h2>
+                    <form id="automod-form">
+                        <div class="setting-item">
+                            <label>Spam Protection</label>
+                            <select name="spam_enabled" class="input-select">
+                                <option value="1" <%= automod.spam_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.spam_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Spam Threshold (messages/5s)</label>
+                            <input type="number" name="spam_threshold" value="<%= automod.spam_threshold %>" class="input-field">
+                        </div>
+                        <div class="setting-item">
+                            <label>Link Filtering</label>
+                            <select name="links_enabled" class="input-select">
+                                <option value="1" <%= automod.links_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.links_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Invite Filtering</label>
+                            <select name="invites_enabled" class="input-select">
+                                <option value="1" <%= automod.invites_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.invites_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Bad Words Filter</label>
+                            <select name="badwords_enabled" class="input-select">
+                                <option value="1" <%= automod.badwords_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.badwords_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Auto-Mod Settings</button>
+                    </form>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Forbidden Words</h2>
+                    <div class="blacklist-manager">
+                        <div class="add-word">
+                            <input type="text" id="new-word" placeholder="Add word to block..." class="input-field">
+                            <button id="add-word-btn" class="btn btn-secondary">Add</button>
+                        </div>
+                        <div class="word-list">
+                            <% if (blacklist.length === 0) { %>
+                                <p class="muted">Blacklist is empty.</p>
+                            <% } else { %>
+                                <% blacklist.forEach(item => { %>
+                                    <span class="word-tag">
+                                        <%= item.word %>
+                                        <button class="remove-word" onclick="removeWord('<%= item.word %>')">&times;</button>
+                                    </span>
+                                <% }); %>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="settings-section">
                 <h2>Warning History</h2>
@@ -83,5 +146,74 @@
     </div>
 
     <%- include('../partials/footer') %>
+
+    <script>
+        // Handle Auto-mod form
+        document.getElementById('automod-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            try {
+                const response = await fetch(`/api/server/<%= guild.id %>/automod`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Auto-mod settings saved successfully!');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Failed to save settings');
+            }
+        });
+
+        // Handle Blacklist
+        document.getElementById('add-word-btn').addEventListener('click', async () => {
+            const wordInput = document.getElementById('new-word');
+            const word = wordInput.value.trim();
+            if (!word) return;
+
+            try {
+                const response = await fetch(`/api/server/<%= guild.id %>/automod/blacklist`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Failed to add word');
+            }
+        });
+
+        async function removeWord(word) {
+            if (!confirm(`Remove "${word}" from the blacklist?`)) return;
+
+            try {
+                const response = await fetch(`/api/server/<%= guild.id %>/automod/blacklist/${encodeURIComponent(word)}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Failed to remove word');
+            }
+        }
+    </script>
 </body>
 </html>

@@ -48,9 +48,19 @@ function initDatabase() {
             welcome_channel TEXT,
             leave_channel TEXT,
             log_channel TEXT,
-            mute_role TEXT
+            mute_role TEXT,
+            rank_card_color TEXT DEFAULT '#5865F2',
+            auto_role TEXT
         )
     `);
+
+    // Migration: Add columns if they don't exist
+    try {
+        db.exec("ALTER TABLE guild_settings ADD COLUMN rank_card_color TEXT DEFAULT '#5865F2'");
+    } catch (e) { /* Column already exists */ }
+    try {
+        db.exec("ALTER TABLE guild_settings ADD COLUMN auto_role TEXT");
+    } catch (e) { /* Column already exists */ }
 
     // Raid protection settings table
     db.exec(`
@@ -103,6 +113,52 @@ function initDatabase() {
         )
     `);
 
+    // Auto-mod settings table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS automod_settings (
+            guild_id TEXT PRIMARY KEY,
+            spam_enabled INTEGER DEFAULT 0,
+            spam_threshold INTEGER DEFAULT 5,
+            links_enabled INTEGER DEFAULT 0,
+            invites_enabled INTEGER DEFAULT 0,
+            badwords_enabled INTEGER DEFAULT 0
+        )
+    `);
+
+    // Word blacklist table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS word_blacklist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            word TEXT NOT NULL,
+            UNIQUE(guild_id, word)
+        )
+    `);
+
+    // Leveling multipliers table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS leveling_multipliers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            type TEXT NOT NULL, -- 'role' or 'channel'
+            multiplier REAL DEFAULT 1.0,
+            UNIQUE(guild_id, target_id, type)
+        )
+    `);
+
+    // Reaction roles table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS reaction_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            message_id TEXT NOT NULL,
+            emoji TEXT NOT NULL,
+            role_id TEXT NOT NULL,
+            UNIQUE(guild_id, message_id, emoji)
+        )
+    `);
+
     console.log('Database initialized successfully');
 }
 
@@ -114,6 +170,14 @@ const getUserData = db.prepare('SELECT * FROM users WHERE user_id = ? AND guild_
 const insertUser = db.prepare('INSERT OR IGNORE INTO users (user_id, guild_id) VALUES (?, ?)');
 const updateUserXP = db.prepare('UPDATE users SET xp = ?, level = ?, last_message = ? WHERE user_id = ? AND guild_id = ?');
 const getLeaderboard = db.prepare('SELECT * FROM users WHERE guild_id = ? ORDER BY level DESC, xp DESC LIMIT ?');
+
+function getUserRank(userId, guildId) {
+    const user = getUserData.get(userId, guildId);
+    if (!user) return 0;
+
+    const result = db.prepare('SELECT COUNT(*) as rank FROM users WHERE guild_id = ? AND (level > ? OR (level = ? AND xp > ?))').get(guildId, user.level, user.level, user.xp);
+    return result.rank + 1;
+}
 
 function addXP(userId, guildId, xp) {
     insertUser.run(userId, guildId);
@@ -148,7 +212,7 @@ const clearWarnings = db.prepare('DELETE FROM warnings WHERE user_id = ? AND gui
 
 // Guild settings functions
 const getGuildSettings = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?');
-const setGuildSetting = db.prepare('INSERT OR REPLACE INTO guild_settings (guild_id, welcome_channel, leave_channel, log_channel, mute_role) VALUES (?, ?, ?, ?, ?)');
+const setGuildSetting = db.prepare('INSERT OR REPLACE INTO guild_settings (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role) VALUES (?, ?, ?, ?, ?, ?, ?)');
 
 // Raid protection functions
 const getRaidSettings = db.prepare('SELECT * FROM raid_settings WHERE guild_id = ?');
@@ -171,6 +235,60 @@ const getRoleRewards = db.prepare('SELECT * FROM role_rewards WHERE guild_id = ?
 const getRoleRewardForLevel = db.prepare('SELECT * FROM role_rewards WHERE guild_id = ? AND level = ?');
 const addRoleReward = db.prepare('INSERT OR REPLACE INTO role_rewards (guild_id, level, role_id) VALUES (?, ?, ?)');
 const deleteRoleReward = db.prepare('DELETE FROM role_rewards WHERE guild_id = ? AND level = ?');
+
+// Auto-mod functions
+const getAutomodSettings = db.prepare('SELECT * FROM automod_settings WHERE guild_id = ?');
+const setAutomodSettings = db.prepare(`
+    INSERT OR REPLACE INTO automod_settings 
+    (guild_id, spam_enabled, spam_threshold, links_enabled, invites_enabled, badwords_enabled) 
+    VALUES (?, ?, ?, ?, ?, ?)
+`);
+
+const getBlacklist = db.prepare('SELECT word FROM word_blacklist WHERE guild_id = ?');
+const addBlacklistWord = db.prepare('INSERT OR IGNORE INTO word_blacklist (guild_id, word) VALUES (?, ?)');
+const removeBlacklistWord = db.prepare('DELETE FROM word_blacklist WHERE guild_id = ? AND word = ?');
+
+// Multiplier functions
+const getMultipliers = db.prepare('SELECT * FROM leveling_multipliers WHERE guild_id = ?');
+const addMultiplier = db.prepare('INSERT OR REPLACE INTO leveling_multipliers (guild_id, target_id, type, multiplier) VALUES (?, ?, ?, ?)');
+const deleteMultiplier = db.prepare('DELETE FROM leveling_multipliers WHERE guild_id = ? AND target_id = ? AND type = ?');
+
+// Reaction role functions
+const getReactionRoles = db.prepare('SELECT * FROM reaction_roles WHERE guild_id = ?');
+const getAllReactionRoles = db.prepare('SELECT * FROM reaction_roles');
+const addReactionRole = db.prepare('INSERT OR REPLACE INTO reaction_roles (guild_id, message_id, emoji, role_id) VALUES (?, ?, ?, ?)');
+const deleteReactionRole = db.prepare('DELETE FROM reaction_roles WHERE guild_id = ? AND message_id = ? AND emoji = ?');
+
+function getGuildSettingsOrDefault(guildId) {
+    let settings = getGuildSettings.get(guildId);
+    if (!settings) {
+        settings = {
+            guild_id: guildId,
+            welcome_channel: null,
+            leave_channel: null,
+            log_channel: null,
+            mute_role: null,
+            rank_card_color: '#5865F2',
+            auto_role: null
+        };
+    }
+    return settings;
+}
+
+function getAutomodSettingsOrDefault(guildId) {
+    let settings = getAutomodSettings.get(guildId);
+    if (!settings) {
+        settings = {
+            guild_id: guildId,
+            spam_enabled: 0,
+            spam_threshold: 5,
+            links_enabled: 0,
+            invites_enabled: 0,
+            badwords_enabled: 0
+        };
+    }
+    return settings;
+}
 
 function getRaidSettingsOrDefault(guildId) {
     let settings = getRaidSettings.get(guildId);
@@ -198,6 +316,7 @@ function getRaidSettingsOrDefault(guildId) {
 module.exports = {
     initDatabase,
     getUserData,
+    getUserRank,
     addXP,
     calculateLevel,
     calculateXPForLevel,
@@ -210,6 +329,7 @@ module.exports = {
     getWarnings,
     clearWarnings,
     getGuildSettings,
+    getGuildSettingsOrDefault,
     setGuildSetting,
     getRaidSettings,
     getRaidSettingsOrDefault,
@@ -223,5 +343,18 @@ module.exports = {
     getRoleRewards,
     getRoleRewardForLevel,
     addRoleReward,
-    deleteRoleReward
+    deleteRoleReward,
+    getAutomodSettings,
+    getAutomodSettingsOrDefault,
+    setAutomodSettings,
+    getBlacklist,
+    addBlacklistWord,
+    removeBlacklistWord,
+    getMultipliers,
+    addMultiplier,
+    deleteMultiplier,
+    getReactionRoles,
+    getAllReactionRoles,
+    addReactionRole,
+    deleteReactionRole
 };

@@ -1,62 +1,80 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const logger = require('../../logger');
 
 module.exports = {
     name: 'mute',
     description: 'Mute a user (timeout)',
     usage: '!mute @user <duration_in_minutes> [reason]',
     permissions: PermissionFlagsBits.ModerateMembers,
-    async execute(message, args) {
-        const user = message.mentions.users.first();
+    data: new SlashCommandBuilder()
+        .setName('mute')
+        .setDescription('Mute a user (timeout)')
+        .addUserOption(opt => opt.setName('target').setDescription('The user to mute').setRequired(true))
+        .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason for the mute').setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const user = isInteraction ? interaction.options.getUser('target') : interaction.mentions.users.first();
+        const duration = isInteraction ? interaction.options.getInteger('duration') : parseInt(args[1]);
+        const reason = isInteraction ? (interaction.options.getString('reason') || 'No reason provided') : (args.slice(2).join(' ') || 'No reason provided');
 
         if (!user) {
-            return message.reply('Please mention a user to mute!');
+            const msg = 'Please mention a user to mute!';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
-        const duration = parseInt(args[1]);
         if (!duration || duration < 1) {
-            return message.reply('Please specify a duration in minutes (e.g., !mute @user 10 spam)');
+            const msg = 'Please specify a valid duration in minutes.';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
-        const member = message.guild.members.cache.get(user.id);
+        const member = interaction.guild.members.cache.get(user.id);
         if (!member) {
-            return message.reply('User not found in this server!');
+            const msg = 'User not found in this server!';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
-        // Prevent self-mute
-        if (user.id === message.author.id) {
-            return message.reply('You cannot mute yourself!');
+        const author = isInteraction ? interaction.user : interaction.author;
+
+        if (user.id === author.id) {
+            const msg = 'You cannot mute yourself!';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
-        const reason = args.slice(2).join(' ') || 'No reason provided';
         const durationMs = duration * 60 * 1000;
-
-        // Max timeout is 28 days
         if (durationMs > 28 * 24 * 60 * 60 * 1000) {
-            return message.reply('Maximum mute duration is 28 days!');
+            const msg = 'Maximum mute duration is 28 days!';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
         try {
-            // Timeout the user
-            await member.timeout(durationMs, `${reason} | Muted by ${message.author.tag}`);
+            await member.timeout(durationMs, `${reason} | Muted by ${author.tag}`);
+            await logger.logModeration(interaction.guild, 'MUTE', author, user, `${duration}m | ${reason}`);
 
             const embed = new EmbedBuilder()
                 .setColor('#808080')
                 .setTitle('User Muted')
                 .setDescription(`${user.tag} has been muted`)
                 .addFields(
-                    { name: 'Moderator', value: message.author.tag, inline: true },
+                    { name: 'Moderator', value: author.tag, inline: true },
                     { name: 'Duration', value: `${duration} minutes`, inline: true },
                     { name: 'Reason', value: reason, inline: false }
                 )
                 .setTimestamp();
 
-            await message.channel.send({ embeds: [embed] });
+            if (isInteraction) {
+                await interaction.reply({ embeds: [embed] });
+            } else {
+                await interaction.channel.send({ embeds: [embed] });
+            }
 
-            // Send DM to user
-            await user.send(`You have been muted in ${message.guild.name} for ${duration} minutes. Reason: ${reason}`).catch(() => {});
+            await user.send(`You have been muted in ${interaction.guild.name} for ${duration} minutes. Reason: ${reason}`).catch(() => {});
         } catch (error) {
             console.error('Error muting user:', error);
-            await message.reply('Failed to mute the user!');
+            const errMsg = 'Failed to mute the user!';
+            if (isInteraction) await interaction.reply({ content: errMsg, ephemeral: true });
+            else interaction.reply(errMsg);
         }
     }
 };

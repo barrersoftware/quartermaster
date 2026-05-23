@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const db = require('../../database');
 
 module.exports = {
@@ -7,12 +7,21 @@ module.exports = {
     description: 'View warnings for a user',
     usage: '!warnings @user',
     permissions: PermissionFlagsBits.ModerateMembers,
-    async execute(message, args) {
-        const user = message.mentions.users.first() || message.author;
-        const warnings = db.getWarnings.all(user.id, message.guild.id);
+    data: new SlashCommandBuilder()
+        .setName('warnings')
+        .setDescription('View warnings for a user')
+        .addUserOption(opt => opt.setName('target').setDescription('The user to view warnings for').setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const user = isInteraction ? (interaction.options.getUser('target') || interaction.user) : (interaction.mentions.users.first() || interaction.author);
+        const guildId = interaction.guild.id;
+
+        const warnings = db.getWarnings.all(user.id, guildId);
 
         if (!warnings || warnings.length === 0) {
-            return message.reply(`${user.tag} has no warnings!`);
+            const msg = `${user.tag} has no warnings!`;
+            return isInteraction ? interaction.reply(msg) : interaction.reply(msg);
         }
 
         let description = '';
@@ -29,6 +38,10 @@ module.exports = {
             .setFooter({ text: `Total warnings: ${warnings.length}` })
             .setTimestamp();
 
-        await message.channel.send({ embeds: [embed] });
+        if (isInteraction) {
+            await interaction.reply({ embeds: [embed] });
+        } else {
+            await interaction.channel.send({ embeds: [embed] });
+        }
     }
 };

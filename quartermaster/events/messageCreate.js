@@ -31,10 +31,24 @@ module.exports = {
                 // Check cooldown
                 const now = Date.now();
                 if (!userData || now - userData.last_message >= config.leveling.cooldown * 1000) {
-                    // Random XP between min and max
-                    const xpGain = Math.floor(
+                    // Base XP
+                    let xpGain = Math.floor(
                         Math.random() * (config.leveling.xpPerMessage.max - config.leveling.xpPerMessage.min + 1)
                     ) + config.leveling.xpPerMessage.min;
+
+                    // Apply Multipliers
+                    const multipliers = db.getMultipliers.all(guildId);
+                    let totalMultiplier = 1.0;
+
+                    for (const m of multipliers) {
+                        if (m.type === 'channel' && m.target_id === message.channel.id) {
+                            totalMultiplier = Math.max(totalMultiplier, m.multiplier);
+                        } else if (m.type === 'role' && message.member.roles.cache.has(m.target_id)) {
+                            totalMultiplier = Math.max(totalMultiplier, m.multiplier);
+                        }
+                    }
+
+                    xpGain = Math.floor(xpGain * totalMultiplier);
 
                     const result = db.addXP(userId, guildId, xpGain);
 

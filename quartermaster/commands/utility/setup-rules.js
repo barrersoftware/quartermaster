@@ -1,20 +1,26 @@
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'setup-rules',
     description: 'Create a rules embed with react-to-accept verification',
     usage: '!setup-rules #channel @verified-role',
     permissions: PermissionFlagsBits.ManageGuild,
-    async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-            return message.reply('❌ You need Manage Server permission.');
-        }
+    data: new SlashCommandBuilder()
+        .setName('setup-rules')
+        .setDescription('Create a rules embed with react-to-accept verification')
+        .addChannelOption(option => option.setName('channel').setDescription('The channel to post rules in').setRequired(true))
+        .addRoleOption(option => option.setName('role').setDescription('The role to give on verification').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const channel = isInteraction ? interaction.options.getChannel('channel') : interaction.mentions.channels.first();
+        const role = isInteraction ? interaction.options.getRole('role') : interaction.mentions.roles.first();
 
-        const channel = message.mentions.channels.first();
-        const role = message.mentions.roles.first();
+        const guild = interaction.guild;
 
         if (!channel || !role) {
-            return message.reply('Usage: `!setup-rules #channel @verified-role`\nExample: `!setup-rules #rules @Member`');
+            const msg = 'Usage: `!setup-rules #channel @verified-role`';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
         const rulesEmbed = new EmbedBuilder()
@@ -22,49 +28,44 @@ module.exports = {
             .setTitle('📜 Server Rules')
             .setDescription('Please read and accept our rules to gain access to the server.')
             .addFields(
-                { name: '1️⃣ Be Respectful', value: 'Treat all members with respect. No harassment, hate speech, or discrimination.', inline: false },
-                { name: '2️⃣ No Spam', value: 'Do not spam messages, links, or mentions. Keep conversations relevant.', inline: false },
-                { name: '3️⃣ No NSFW Content', value: 'Keep all content appropriate. NSFW content belongs in designated channels only.', inline: false },
-                { name: '4️⃣ Follow Discord ToS', value: 'All Discord Terms of Service and Community Guidelines apply.', inline: false },
-                { name: '5️⃣ Use Appropriate Channels', value: 'Post content in the correct channels. Ask mods if unsure.', inline: false },
-                { name: '\u200B', value: '✅ **React with ✅ below to accept the rules and gain access!**', inline: false }
+                { name: '1️⃣ Be Respectful', value: 'Treat all members with respect.', inline: false },
+                { name: '2️⃣ No Spam', value: 'Do not spam messages or links.', inline: false },
+                { name: '3️⃣ No NSFW', value: 'Keep content appropriate.', inline: false },
+                { name: '\u200B', value: '✅ **React with ✅ below to gain access!**', inline: false }
             )
-            .setFooter({ text: `${message.guild.name} • By reacting, you agree to follow these rules` })
+            .setFooter({ text: `${guild.name}` })
             .setTimestamp();
 
         try {
             const rulesMessage = await channel.send({ embeds: [rulesEmbed] });
             await rulesMessage.react('✅');
 
-            // Store this in reaction roles system
-            const reactionRoleCommand = message.client.commands.get('reactionrole');
-            if (reactionRoleCommand && reactionRoleCommand.initialize) {
-                reactionRoleCommand.initialize(message.client);
-            }
-
-            if (!message.client.reactionRoles) {
-                message.client.reactionRoles = new Map();
-            }
-
-            const guildId = message.guild.id;
-            if (!message.client.reactionRoles.has(guildId)) {
-                message.client.reactionRoles.set(guildId, new Map());
-            }
-
-            const guildRoles = message.client.reactionRoles.get(guildId);
-            const key = `${rulesMessage.id}-✅`;
-            guildRoles.set(key, role.id);
+            // Save reaction data
+            db.addReactionRole.run(guild.id, rulesMessage.id, '✅', role.id);
+            
+            if (!interaction.client.reactionRoles) interaction.client.reactionRoles = new Map();
+            if (!interaction.client.reactionRoles.has(guild.id)) interaction.client.reactionRoles.set(guild.id, new Map());
+            interaction.client.reactionRoles.get(guild.id).set(`${rulesMessage.id}-✅`, role.id);
 
             const confirmEmbed = new EmbedBuilder()
                 .setColor('#00FF00')
                 .setTitle('✅ Rules Posted')
-                .setDescription(`Rules posted in ${channel}!\nUsers who react with ✅ will receive ${role}`)
+                .setDescription(`Rules posted in ${channel}!\nVerification role: ${role}`)
                 .setTimestamp();
 
-            await message.channel.send({ embeds: [confirmEmbed] });
+            if (isInteraction) {
+                await interaction.reply({ embeds: [confirmEmbed] });
+            } else {
+                await interaction.reply({ embeds: [confirmEmbed] });
+            }
         } catch (error) {
             console.error('Error setting up rules:', error);
-            message.reply('❌ Failed to setup rules. Make sure I have permission to post in that channel.');
+            const errMsg = '❌ Failed to setup rules.';
+            if (isInteraction) {
+                await interaction.reply({ content: errMsg, ephemeral: true });
+            } else {
+                await interaction.reply(errMsg);
+            }
         }
     }
 };

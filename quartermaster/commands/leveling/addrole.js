@@ -1,49 +1,48 @@
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const db = require('../../database');
 
 module.exports = {
     name: 'addrole',
-    description: 'Add a role reward for reaching a specific level',
+    description: 'Add a role reward for a specific level',
     usage: '!addrole <level> <@role>',
-    requiredPermissions: [PermissionFlagsBits.ManageRoles],
-    async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
-            return message.reply('❌ You need the Manage Roles permission to use this command.');
+    permissions: PermissionFlagsBits.ManageRoles,
+    data: new SlashCommandBuilder()
+        .setName('addrole')
+        .setDescription('Add a role reward for a specific level')
+        .addIntegerOption(opt => opt.setName('level').setDescription('Level requirement').setRequired(true).setMinValue(1))
+        .addRoleOption(opt => opt.setName('role').setDescription('Role to award').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const level = isInteraction ? interaction.options.getInteger('level') : parseInt(args[0]);
+        const role = isInteraction ? interaction.options.getRole('role') : interaction.mentions.roles.first();
+
+        if (!level || !role) {
+            const msg = 'Usage: `!addrole <level> <@role>`';
+            return isInteraction ? interaction.reply({ content: msg, ephemeral: true }) : interaction.reply(msg);
         }
 
-        if (args.length < 2) {
-            return message.reply('Usage: `!addrole <level> <@role>`\nExample: `!addrole 10 @Member`');
-        }
-
-        const level = parseInt(args[0]);
-        if (isNaN(level) || level < 1) {
-            return message.reply('❌ Level must be a number greater than 0.');
-        }
-
-        const role = message.mentions.roles.first();
-        if (!role) {
-            return message.reply('❌ Please mention a valid role.');
-        }
-
-        // Check if bot can manage this role
-        const botMember = message.guild.members.cache.get(message.client.user.id);
-        if (role.position >= botMember.roles.highest.position) {
-            return message.reply('❌ I cannot manage this role as it is higher than or equal to my highest role.');
-        }
+        const guildId = interaction.guild.id;
 
         try {
-            db.addRoleReward.run(message.guild.id, level, role.id);
-            
+            db.addRoleReward.run(guildId, level, role.id);
+
             const embed = new EmbedBuilder()
-                .setColor('#5865F2')
+                .setColor('#00FF00')
                 .setTitle('✅ Role Reward Added')
-                .setDescription(`Users will now receive ${role} when they reach level **${level}**`)
+                .setDescription(`Members will now receive ${role} upon reaching **Level ${level}**.`)
                 .setTimestamp();
 
-            await message.channel.send({ embeds: [embed] });
+            if (isInteraction) {
+                await interaction.reply({ embeds: [embed] });
+            } else {
+                await interaction.channel.send({ embeds: [embed] });
+            }
         } catch (error) {
             console.error('Error adding role reward:', error);
-            message.reply('❌ An error occurred while adding the role reward.');
+            const errMsg = 'Failed to add role reward!';
+            if (isInteraction) await interaction.reply({ content: errMsg, ephemeral: true });
+            else interaction.reply(errMsg);
         }
     }
 };

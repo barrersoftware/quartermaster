@@ -1,156 +1,228 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const db = require('../../database');
+const logger = require('../../logger');
 
-// Spam tracking per user
+// Spam tracking per user (non-persistent)
 const messageTracker = new Map();
 const linkRegex = /(https?:\/\/[^\s]+)/gi;
 const inviteRegex = /(discord\.gg|discordapp\.com\/invite|discord\.com\/invite)\/[a-zA-Z0-9]+/gi;
 
 module.exports = {
     name: 'automod',
-    description: 'Configure auto-moderation settings',
-    usage: '!automod <enable|disable> <spam|links|invites> [threshold]',
+    description: 'Configure auto-moderation settings and word blacklist',
+    usage: '!automod <enable|disable> <spam|links|invites|badwords>\n!automod blacklist add <word>\n!automod blacklist remove <word>\n!automod blacklist list',
     permissions: PermissionFlagsBits.ManageGuild,
-    async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-            return message.reply('❌ You need the Manage Server permission to use this command.');
-        }
+    data: new SlashCommandBuilder()
+        .setName('automod')
+        .setDescription('Configure auto-moderation settings')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .addSubcommandGroup(group =>
+            group.setName('settings')
+                .setDescription('Enable or disable auto-mod features')
+                .addSubcommand(sub =>
+                    sub.setName('update')
+                        .setDescription('Update a specific auto-mod setting')
+                        .addStringOption(opt => opt.setName('type').setDescription('The feature to update').setRequired(true).addChoices(
+                            { name: 'Spam', value: 'spam' },
+                            { name: 'Links', value: 'links' },
+                            { name: 'Invites', value: 'invites' },
+                            { name: 'Bad Words', value: 'badwords' }
+                        ))
+                        .addStringOption(opt => opt.setName('action').setDescription('Enable or Disable').setRequired(true).addChoices(
+                            { name: 'Enable', value: 'enable' },
+                            { name: 'Disable', value: 'disable' }
+                        ))
+                )
+        )
+        .addSubcommandGroup(group =>
+            group.setName('blacklist')
+                .setDescription('Manage the word blacklist')
+                .addSubcommand(sub =>
+                    sub.setName('add')
+                        .setDescription('Add a word to the blacklist')
+                        .addStringOption(opt => opt.setName('word').setDescription('The word to block').setRequired(true))
+                )
+                .addSubcommand(sub =>
+                    sub.setName('remove')
+                        .setDescription('Remove a word from the blacklist')
+                        .addStringOption(opt => opt.setName('word').setDescription('The word to unblock').setRequired(true))
+                )
+                .addSubcommand(sub =>
+                    sub.setName('list')
+                        .setDescription('List all blacklisted words')
+                )
+        ),
+    async execute(interaction, args) {
+        const isInteraction = interaction.isCommand?.() || false;
+        const guildId = interaction.guild.id;
 
-        if (args.length < 2) {
-            return message.reply('Usage: `!automod <enable|disable> <spam|links|invites>`\nExample: `!automod enable spam 5`');
-        }
+        if (isInteraction) {
+            const group = interaction.options.getSubcommandGroup();
+            const sub = interaction.options.getSubcommand();
 
-        const action = args[0].toLowerCase();
-        const type = args[1].toLowerCase();
-        
-        if (!['enable', 'disable'].includes(action)) {
-            return message.reply('❌ Action must be either `enable` or `disable`');
-        }
-
-        if (!['spam', 'links', 'invites'].includes(type)) {
-            return message.reply('❌ Type must be one of: `spam`, `links`, `invites`');
-        }
-
-        const guildId = message.guild.id;
-        
-        // Store in guild settings (you'd want to add this to database properly)
-        if (!message.client.automodSettings) {
-            message.client.automodSettings = new Map();
-        }
-        
-        if (!message.client.automodSettings.has(guildId)) {
-            message.client.automodSettings.set(guildId, {
-                spam: { enabled: false, threshold: 5, window: 5000 },
-                links: { enabled: false },
-                invites: { enabled: false }
-            });
-        }
-
-        const settings = message.client.automodSettings.get(guildId);
-        
-        if (type === 'spam') {
-            const threshold = parseInt(args[2]) || 5;
-            settings.spam.enabled = action === 'enable';
-            settings.spam.threshold = threshold;
-        } else {
-            settings[type].enabled = action === 'enable';
-        }
-
-        const embed = new EmbedBuilder()
-            .setColor(action === 'enable' ? '#00FF00' : '#FF0000')
-            .setTitle(`🛡️ Auto-Moderation ${action === 'enable' ? 'Enabled' : 'Disabled'}`)
-            .setDescription(`${type.charAt(0).toUpperCase() + type.slice(1)} protection has been ${action}d`)
-            .setTimestamp();
-
-        if (type === 'spam' && action === 'enable') {
-            embed.addFields({ name: 'Threshold', value: `${settings.spam.threshold} messages in ${settings.spam.window / 1000} seconds`, inline: false });
-        }
-
-        await message.channel.send({ embeds: [embed] });
-    },
-
-    // This function is called by messageCreate event
-    async checkMessage(message, client) {
-        if (!client.automodSettings) return;
-        
-        const guildId = message.guild.id;
-        const settings = client.automodSettings.get(guildId);
-        
-        if (!settings) return;
-
-        const userId = message.author.id;
-        const now = Date.now();
-
-        // Spam detection
-        if (settings.spam.enabled) {
-            if (!messageTracker.has(userId)) {
-                messageTracker.set(userId, []);
+            if (group === 'blacklist') {
+                if (sub === 'add') {
+                    const word = interaction.options.getString('word').toLowerCase();
+                    db.addBlacklistWord.run(guildId, word);
+                    return interaction.reply(`✅ Added \`${word}\` to the blacklist.`);
+                }
+                if (sub === 'remove') {
+                    const word = interaction.options.getString('word').toLowerCase();
+                    db.removeBlacklistWord.run(guildId, word);
+                    return interaction.reply(`✅ Removed \`${word}\` from the blacklist.`);
+                }
+                if (sub === 'list') {
+                    const words = db.getBlacklist.all(guildId);
+                    if (words.length === 0) return interaction.reply('The word blacklist is empty.');
+                    const embed = new EmbedBuilder()
+                        .setColor('#5865F2')
+                        .setTitle('🚫 Word Blacklist')
+                        .setDescription(words.map(w => `\`${w.word}\``).join(', '))
+                        .setTimestamp();
+                    return interaction.reply({ embeds: [embed] });
+                }
             }
 
+            if (group === 'settings' && sub === 'update') {
+                const type = interaction.options.getString('type');
+                const action = interaction.options.getString('action');
+                
+                const settings = db.getAutomodSettingsOrDefault(guildId);
+                const val = action === 'enable' ? 1 : 0;
+
+                if (type === 'spam') settings.spam_enabled = val;
+                if (type === 'links') settings.links_enabled = val;
+                if (type === 'invites') settings.invites_enabled = val;
+                if (type === 'badwords') settings.badwords_enabled = val;
+
+                db.setAutomodSettings.run(
+                    guildId,
+                    settings.spam_enabled,
+                    settings.spam_threshold,
+                    settings.links_enabled,
+                    settings.invites_enabled,
+                    settings.badwords_enabled
+                );
+
+                const embed = new EmbedBuilder()
+                    .setColor(action === 'enable' ? '#00FF00' : '#FF0000')
+                    .setTitle(`🛡️ Auto-Moderation ${action === 'enable' ? 'Enabled' : 'Disabled'}`)
+                    .setDescription(`${type.charAt(0).toUpperCase() + type.slice(1)} protection has been ${action}d`)
+                    .setTimestamp();
+
+                return interaction.reply({ embeds: [embed] });
+            }
+        } else {
+            // Legacy Prefix Logic (existing code)
+            const action = args[0].toLowerCase();
+            if (action === 'blacklist') {
+                const subAction = args[1]?.toLowerCase();
+                if (subAction === 'add') {
+                    const word = args.slice(2).join(' ').toLowerCase();
+                    if (!word) return interaction.reply('Please specify a word.');
+                    db.addBlacklistWord.run(guildId, word);
+                    return interaction.reply(`✅ Added \`${word}\` to the blacklist.`);
+                }
+                if (subAction === 'remove') {
+                    const word = args.slice(2).join(' ').toLowerCase();
+                    if (!word) return interaction.reply('Please specify a word.');
+                    db.removeBlacklistWord.run(guildId, word);
+                    return interaction.reply(`✅ Removed \`${word}\` from the blacklist.`);
+                }
+                if (subAction === 'list') {
+                    const words = db.getBlacklist.all(guildId);
+                    const embed = new EmbedBuilder().setColor('#5865F2').setTitle('🚫 Word Blacklist').setDescription(words.map(w => `\`${w.word}\``).join(', ') || 'Empty');
+                    return interaction.channel.send({ embeds: [embed] });
+                }
+            }
+
+            const type = args[1]?.toLowerCase();
+            if (!['enable', 'disable'].includes(action)) return interaction.reply('Action must be enable/disable');
+            if (!['spam', 'links', 'invites', 'badwords'].includes(type)) return interaction.reply('Type error');
+
+            const settings = db.getAutomodSettingsOrDefault(guildId);
+            const val = action === 'enable' ? 1 : 0;
+            settings[`${type}_enabled`] = val; // Note: simplified for brevity in prefix version
+
+            db.setAutomodSettings.run(guildId, settings.spam_enabled, settings.spam_threshold, settings.links_enabled, settings.invites_enabled, settings.badwords_enabled);
+            interaction.reply(`✅ ${type} ${action}d`);
+        }
+    },
+
+    async checkMessage(message, client) {
+        if (!message.guild || message.author.bot) return false;
+
+        const guildId = message.guild.id;
+        const settings = db.getAutomodSettingsOrDefault(guildId);
+        
+        // 1. Bad Words Check
+        if (settings.badwords_enabled) {
+            const blacklist = db.getBlacklist.all(guildId);
+            const content = message.content.toLowerCase();
+            
+            for (const item of blacklist) {
+                if (content.includes(item.word)) {
+                    try {
+                        await message.delete();
+                        const warnReason = `Auto-mod: Used blacklisted word \`${item.word}\``;
+                        db.addWarning.run(message.author.id, guildId, client.user.id, warnReason);
+                        
+                        await logger.logModeration(message.guild, 'AUTOMOD (WORD)', client.user, message.author, warnReason);
+                        
+                        const msg = await message.channel.send(`⚠️ ${message.author}, that word is not allowed here! (Warning added)`);
+                        setTimeout(() => msg.delete().catch(() => {}), 5000);
+                        return true;
+                    } catch (e) { console.error(e); }
+                }
+            }
+        }
+
+        // 2. Link Detection
+        if (settings.links_enabled && linkRegex.test(message.content)) {
+            try {
+                await message.delete();
+                await logger.logModeration(message.guild, 'AUTOMOD (LINK)', client.user, message.author, 'Posted unauthorized link');
+                const msg = await message.channel.send(`⚠️ ${message.author}, links are not allowed!`);
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+                return true;
+            } catch (e) { console.error(e); }
+        }
+
+        // 3. Invite Detection
+        if (settings.invites_enabled && inviteRegex.test(message.content)) {
+            try {
+                await message.delete();
+                await logger.logModeration(message.guild, 'AUTOMOD (INVITE)', client.user, message.author, 'Posted Discord invite');
+                const msg = await message.channel.send(`⚠️ ${message.author}, Discord invites are not allowed!`);
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+                return true;
+            } catch (e) { console.error(e); }
+        }
+
+        // 4. Spam Detection
+        if (settings.spam_enabled) {
+            const userId = message.author.id;
+            const now = Date.now();
+            const window = 5000; // 5 seconds
+
+            if (!messageTracker.has(userId)) messageTracker.set(userId, []);
             const userMessages = messageTracker.get(userId);
             userMessages.push(now);
 
-            // Remove old messages outside the time window
-            const recentMessages = userMessages.filter(timestamp => now - timestamp < settings.spam.window);
+            const recentMessages = userMessages.filter(t => now - t < window);
             messageTracker.set(userId, recentMessages);
 
-            if (recentMessages.length >= settings.spam.threshold) {
+            if (recentMessages.length >= settings.spam_threshold) {
                 try {
                     await message.delete();
-                    await message.member.timeout(5 * 60 * 1000, 'Auto-mod: Spam detected');
+                    await message.member.timeout(10 * 60 * 1000, 'Auto-mod: Spam detected');
+                    await logger.logModeration(message.guild, 'AUTOMOD (SPAM)', client.user, message.author, 'Spamming messages');
                     
-                    const embed = new EmbedBuilder()
-                        .setColor('#FF0000')
-                        .setTitle('🛡️ Auto-Mod: Spam Detected')
-                        .setDescription(`${message.author} has been muted for 5 minutes for spamming`)
-                        .setTimestamp();
-                    
-                    await message.channel.send({ embeds: [embed] });
-                    
+                    await message.channel.send(`🚫 ${message.author} has been muted for 10 minutes for spamming.`);
                     messageTracker.delete(userId);
-                } catch (error) {
-                    console.error('Error handling spam:', error);
-                }
-                return true;
+                    return true;
+                } catch (e) { console.error(e); }
             }
-        }
-
-        // Link detection
-        if (settings.links.enabled && linkRegex.test(message.content)) {
-            try {
-                await message.delete();
-                await message.author.send('Links are not allowed in this server.').catch(() => {});
-                
-                const embed = new EmbedBuilder()
-                    .setColor('#FF6600')
-                    .setTitle('🛡️ Auto-Mod: Link Blocked')
-                    .setDescription(`Removed a link from ${message.author}`)
-                    .setTimestamp();
-                
-                await message.channel.send({ embeds: [embed] });
-            } catch (error) {
-                console.error('Error handling link:', error);
-            }
-            return true;
-        }
-
-        // Invite detection
-        if (settings.invites.enabled && inviteRegex.test(message.content)) {
-            try {
-                await message.delete();
-                await message.author.send('Discord invites are not allowed in this server.').catch(() => {});
-                
-                const embed = new EmbedBuilder()
-                    .setColor('#FF6600')
-                    .setTitle('🛡️ Auto-Mod: Invite Blocked')
-                    .setDescription(`Removed a Discord invite from ${message.author}`)
-                    .setTimestamp();
-                
-                await message.channel.send({ embeds: [embed] });
-            } catch (error) {
-                console.error('Error handling invite:', error);
-            }
-            return true;
         }
 
         return false;

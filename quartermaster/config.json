@@ -15,10 +15,10 @@
     "logChannelName": "mod-logs"
   },
   "welcome": {
-    "enabled": false,
+    "enabled": true,
     "channelName": "welcome",
     "message": "Welcome {user} to {server}!",
-    "embedColor": "#5865F2"
+    "embedColor": "#5865f2"
   },
   "leave": {
     "enabled": false,
