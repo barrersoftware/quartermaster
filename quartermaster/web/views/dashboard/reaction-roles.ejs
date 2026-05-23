@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Roles - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Reaction Roles</span>
+            </div>
+
+            <h1>Reaction Roles</h1>
+            <p>Assign roles to members when they react to a specific message.</p>
+
+            <div class="settings-section">
+                <h2>Active Reaction Roles</h2>
+                
+                <div class="reaction-roles-list">
+                    <% if (reactionRoles.length === 0) { %>
+                        <p class="muted">No reaction roles configured.</p>
+                    <% } else { %>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Message ID</th>
+                                    <th>Emoji</th>
+                                    <th>Role</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% reactionRoles.forEach(rr => { 
+                                    const role = roles.find(r => r.id === rr.role_id); %>
+                                    <tr>
+                                        <td><code><%= rr.message_id %></code></td>
+                                        <td><%= rr.emoji %></td>
+                                        <td><span class="role-badge" style="background-color: <%= role ? role.hexColor : '#99AAB5' %>">@<%= role ? role.name : rr.role_id %></span></td>
+                                        <td>
+                                            <button class="btn btn-small btn-danger" onclick="deleteReactionRole('<%= rr.message_id %>', '<%= rr.emoji %>')">Delete</button>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    <% } %>
+                </div>
+
+                <div class="add-trigger-box">
+                    <h3>Add New Reaction Role</h3>
+                    <form id="addReactionRoleForm">
+                        <div class="form-group">
+                            <label>Message ID</label>
+                            <input type="text" name="message_id" class="input-field" placeholder="Right click message -> Copy ID" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Emoji</label>
+                            <input type="text" name="emoji" class="input-field" placeholder="e.g. ✅ or :custom_emoji:" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Role to Award</label>
+                            <select name="role_id" class="input-select" required>
+                                <option value="">Select a role...</option>
+                                <% roles.forEach(role => { %>
+                                    <option value="<%= role.id %>">@<%= role.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Reaction Role</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        document.getElementById('addReactionRoleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/reaction-roles`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        async function deleteReactionRole(messageId, emoji) {
+            if (!confirm(`Delete this reaction role?`)) return;
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/reaction-roles/${messageId}/${encodeURIComponent(emoji)}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

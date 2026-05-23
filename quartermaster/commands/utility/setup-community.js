@@ -33,7 +33,7 @@ module.exports = {
             if (!memberRole) {
                 memberRole = await guild.roles.create({
                     name: 'Member',
-                    color: '#3498DB',
+                    colors: '#3498DB',
                     reason: 'Quartermaster Community Setup'
                 });
             }
@@ -113,7 +113,19 @@ module.exports = {
             interaction.client.reactionRoles.get(guild.id).set(`${rulesMsg.id}-✅`, memberRole.id);
 
             // 7. Update Database Settings
-            db.setGuildSetting.run(guild.id, welcomeChannel.id, welcomeChannel.id, logsChannel.id, null, '#5865F2', memberRole.id);
+            const modRole = guild.roles.cache.find(r => r.name.toLowerCase().includes('mod') || r.name.toLowerCase().includes('staff'));
+            const modRolesList = modRole ? [modRole.id] : [];
+
+            db.setGuildSetting.run(
+                guild.id, 
+                welcomeChannel.id, 
+                welcomeChannel.id, 
+                logsChannel.id, 
+                null, 
+                '#5865F2', 
+                memberRole.id,
+                JSON.stringify(modRolesList)
+            );
 
             // 8. Final Success Message
             const successEmbed = new EmbedBuilder()

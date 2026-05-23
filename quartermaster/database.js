@@ -50,7 +50,10 @@ function initDatabase() {
             log_channel TEXT,
             mute_role TEXT,
             rank_card_color TEXT DEFAULT '#5865F2',
-            auto_role TEXT
+            auto_role TEXT,
+            mod_roles TEXT DEFAULT '[]',
+            rank_background TEXT,
+            welcome_background TEXT
         )
     `);
 
@@ -60,6 +63,15 @@ function initDatabase() {
     } catch (e) { /* Column already exists */ }
     try {
         db.exec("ALTER TABLE guild_settings ADD COLUMN auto_role TEXT");
+    } catch (e) { /* Column already exists */ }
+    try {
+        db.exec("ALTER TABLE guild_settings ADD COLUMN mod_roles TEXT DEFAULT '[]'");
+    } catch (e) { /* Column already exists */ }
+    try {
+        db.exec("ALTER TABLE guild_settings ADD COLUMN rank_background TEXT");
+    } catch (e) { /* Column already exists */ }
+    try {
+        db.exec("ALTER TABLE guild_settings ADD COLUMN welcome_background TEXT");
     } catch (e) { /* Column already exists */ }
 
     // Raid protection settings table
@@ -159,6 +171,65 @@ function initDatabase() {
         )
     `);
 
+    // Advanced triggers table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS advanced_triggers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            trigger_phrase TEXT NOT NULL,
+            response TEXT NOT NULL,
+            type TEXT DEFAULT 'text', -- 'text' or 'embed'
+            created_by TEXT,
+            UNIQUE(guild_id, trigger_phrase)
+        )
+    `);
+
+    // Giveaways table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS giveaways (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            channel_id TEXT NOT NULL,
+            message_id TEXT NOT NULL,
+            prize TEXT NOT NULL,
+            winner_count INTEGER DEFAULT 1,
+            end_time INTEGER NOT NULL,
+            ended INTEGER DEFAULT 0,
+            winners TEXT -- JSON array of user IDs
+        )
+    `);
+
+    // Starboard table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS starboard_settings (
+            guild_id TEXT PRIMARY KEY,
+            channel_id TEXT,
+            emoji TEXT DEFAULT '⭐',
+            threshold INTEGER DEFAULT 3
+        )
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS starboard_messages (
+            guild_id TEXT NOT NULL,
+            original_message_id TEXT PRIMARY KEY,
+            starboard_message_id TEXT NOT NULL
+        )
+    `);
+
+    // Social Alerts table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS social_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            platform TEXT NOT NULL, -- 'twitch' or 'youtube'
+            channel_name TEXT NOT NULL,
+            alert_channel_id TEXT NOT NULL,
+            last_notified_id TEXT, -- Video ID or Stream ID
+            UNIQUE(guild_id, platform, channel_name)
+        )
+    `);
+
     console.log('Database initialized successfully');
 }
 
@@ -212,7 +283,7 @@ const clearWarnings = db.prepare('DELETE FROM warnings WHERE user_id = ? AND gui
 
 // Guild settings functions
 const getGuildSettings = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?');
-const setGuildSetting = db.prepare('INSERT OR REPLACE INTO guild_settings (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role) VALUES (?, ?, ?, ?, ?, ?, ?)');
+const setGuildSetting = db.prepare('INSERT OR REPLACE INTO guild_settings (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
 // Raid protection functions
 const getRaidSettings = db.prepare('SELECT * FROM raid_settings WHERE guild_id = ?');
@@ -259,6 +330,30 @@ const getAllReactionRoles = db.prepare('SELECT * FROM reaction_roles');
 const addReactionRole = db.prepare('INSERT OR REPLACE INTO reaction_roles (guild_id, message_id, emoji, role_id) VALUES (?, ?, ?, ?)');
 const deleteReactionRole = db.prepare('DELETE FROM reaction_roles WHERE guild_id = ? AND message_id = ? AND emoji = ?');
 
+// Advanced trigger functions
+const getTriggers = db.prepare('SELECT * FROM advanced_triggers WHERE guild_id = ?');
+const addTrigger = db.prepare('INSERT OR REPLACE INTO advanced_triggers (guild_id, trigger_phrase, response, type, created_by) VALUES (?, ?, ?, ?, ?)');
+const deleteTrigger = db.prepare('DELETE FROM advanced_triggers WHERE guild_id = ? AND trigger_phrase = ?');
+
+// Giveaway functions
+const getGiveaways = db.prepare('SELECT * FROM giveaways WHERE guild_id = ? AND ended = 0');
+const getAllActiveGiveaways = db.prepare('SELECT * FROM giveaways WHERE ended = 0');
+const addGiveaway = db.prepare('INSERT INTO giveaways (guild_id, channel_id, message_id, prize, winner_count, end_time) VALUES (?, ?, ?, ?, ?, ?)');
+const endGiveaway = db.prepare('UPDATE giveaways SET ended = 1, winners = ? WHERE message_id = ?');
+
+// Starboard functions
+const getStarboardSettings = db.prepare('SELECT * FROM starboard_settings WHERE guild_id = ?');
+const setStarboardSettings = db.prepare('INSERT OR REPLACE INTO starboard_settings (guild_id, channel_id, emoji, threshold) VALUES (?, ?, ?, ?)');
+const getStarboardMessage = db.prepare('SELECT * FROM starboard_messages WHERE original_message_id = ?');
+const addStarboardMessage = db.prepare('INSERT INTO starboard_messages (guild_id, original_message_id, starboard_message_id) VALUES (?, ?, ?)');
+
+// Social Alert functions
+const getSocialAlerts = db.prepare('SELECT * FROM social_alerts WHERE guild_id = ?');
+const getAllSocialAlerts = db.prepare('SELECT * FROM social_alerts');
+const addSocialAlert = db.prepare('INSERT OR REPLACE INTO social_alerts (guild_id, platform, channel_name, alert_channel_id) VALUES (?, ?, ?, ?)');
+const deleteSocialAlert = db.prepare('DELETE FROM social_alerts WHERE guild_id = ? AND platform = ? AND channel_name = ?');
+const updateLastNotified = db.prepare('UPDATE social_alerts SET last_notified_id = ? WHERE id = ?');
+
 function getGuildSettingsOrDefault(guildId) {
     let settings = getGuildSettings.get(guildId);
     if (!settings) {
@@ -269,8 +364,19 @@ function getGuildSettingsOrDefault(guildId) {
             log_channel: null,
             mute_role: null,
             rank_card_color: '#5865F2',
-            auto_role: null
+            auto_role: null,
+            mod_roles: '[]',
+            rank_background: null,
+            welcome_background: null
         };
+    }
+    // Parse JSON fields
+    if (typeof settings.mod_roles === 'string') {
+        try {
+            settings.mod_roles = JSON.parse(settings.mod_roles);
+        } catch (e) {
+            settings.mod_roles = [];
+        }
     }
     return settings;
 }
@@ -356,5 +462,21 @@ module.exports = {
     getReactionRoles,
     getAllReactionRoles,
     addReactionRole,
-    deleteReactionRole
+    deleteReactionRole,
+    getTriggers,
+    addTrigger,
+    deleteTrigger,
+    getGiveaways,
+    getAllActiveGiveaways,
+    addGiveaway,
+    endGiveaway,
+    getStarboardSettings,
+    setStarboardSettings,
+    getStarboardMessage,
+    addStarboardMessage,
+    getSocialAlerts,
+    getAllSocialAlerts,
+    addSocialAlert,
+    deleteSocialAlert,
+    updateLastNotified
 };

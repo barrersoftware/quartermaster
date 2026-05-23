@@ -315,7 +315,10 @@ router.post('/server/:guildId/settings/visuals', (req, res) => {
 
     try {
         const settings = db.getGuildSettingsOrDefault(guildId);
-        settings.rank_card_color = req.body.rank_card_color || settings.rank_card_color;
+        
+        if (req.body.rank_card_color) settings.rank_card_color = req.body.rank_card_color;
+        if (req.body.rank_background !== undefined) settings.rank_background = req.body.rank_background || null;
+        if (req.body.welcome_background !== undefined) settings.welcome_background = req.body.welcome_background || null;
 
         db.setGuildSetting.run(
             guildId,
@@ -323,7 +326,11 @@ router.post('/server/:guildId/settings/visuals', (req, res) => {
             settings.leave_channel,
             settings.log_channel,
             settings.mute_role,
-            settings.rank_card_color
+            settings.rank_card_color,
+            settings.auto_role,
+            JSON.stringify(settings.mod_roles),
+            settings.rank_background,
+            settings.welcome_background
         );
 
         res.json({ success: true });
@@ -367,6 +374,195 @@ router.delete('/server/:guildId/leveling/multiplier/:type/:targetId', (req, res)
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to remove multiplier' });
+    }
+});
+
+// Add moderator role
+router.post('/server/:guildId/permissions/mod-roles', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { roleId } = req.body;
+    if (!roleId) return res.status(400).json({ error: 'Missing roleId' });
+
+    try {
+        const settings = db.getGuildSettingsOrDefault(guildId);
+        if (!settings.mod_roles.includes(roleId)) {
+            settings.mod_roles.push(roleId);
+            db.setGuildSetting.run(
+                guildId,
+                settings.welcome_channel,
+                settings.leave_channel,
+                settings.log_channel,
+                settings.mute_role,
+                settings.rank_card_color,
+                settings.auto_role,
+                JSON.stringify(settings.mod_roles)
+            );
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to add role' });
+    }
+});
+
+// Remove moderator role
+router.delete('/server/:guildId/permissions/mod-roles/:roleId', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { roleId } = req.params;
+
+    try {
+        const settings = db.getGuildSettingsOrDefault(guildId);
+        settings.mod_roles = settings.mod_roles.filter(id => id !== roleId);
+        db.setGuildSetting.run(
+            guildId,
+            settings.welcome_channel,
+            settings.leave_channel,
+            settings.log_channel,
+            settings.mute_role,
+            settings.rank_card_color,
+            settings.auto_role,
+            JSON.stringify(settings.mod_roles),
+            settings.rank_background,
+            settings.welcome_background
+        );
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to remove role' });
+    }
+});
+
+// Add trigger
+router.post('/server/:guildId/triggers', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { phrase, response, type } = req.body;
+    if (!phrase || !response) return res.status(400).json({ error: 'Missing fields' });
+
+    try {
+        db.addTrigger.run(guildId, phrase.toLowerCase(), response, type || 'text', req.user.id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add trigger' });
+    }
+});
+
+// Remove trigger
+router.delete('/server/:guildId/triggers/:phrase', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const phrase = req.params.phrase;
+
+    try {
+        db.deleteTrigger.run(guildId, phrase);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove trigger' });
+    }
+});
+
+// Add social alert
+router.post('/server/:guildId/social', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { platform, channel, alert_channel_id } = req.body;
+    if (!platform || !channel || !alert_channel_id) return res.status(400).json({ error: 'Missing fields' });
+
+    try {
+        db.addSocialAlert.run(guildId, platform, channel, alert_channel_id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add social alert' });
+    }
+});
+
+// Remove social alert
+router.delete('/server/:guildId/social/:platform/:channel', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { platform, channel } = req.params;
+
+    try {
+        db.deleteSocialAlert.run(guildId, platform, channel);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove social alert' });
+    }
+});
+
+// Add reaction role
+router.post('/server/:guildId/reaction-roles', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { message_id, emoji, role_id } = req.body;
+    if (!message_id || !emoji || !role_id) return res.status(400).json({ error: 'Missing fields' });
+
+    try {
+        db.addReactionRole.run(guildId, message_id, emoji, role_id);
+        
+        // Update client memory
+        if (!client.reactionRoles.has(guildId)) client.reactionRoles.set(guildId, new Map());
+        client.reactionRoles.get(guildId).set(`${message_id}-${emoji}`, role_id);
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add reaction role' });
+    }
+});
+
+// Delete reaction role
+router.delete('/server/:guildId/reaction-roles/:messageId/:emoji', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    const { messageId, emoji } = req.params;
+
+    try {
+        db.deleteReactionRole.run(guildId, messageId, emoji);
+        
+        // Update client memory
+        if (client.reactionRoles.has(guildId)) {
+            client.reactionRoles.get(guildId).delete(`${messageId}-${emoji}`);
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove reaction role' });
     }
 });
 

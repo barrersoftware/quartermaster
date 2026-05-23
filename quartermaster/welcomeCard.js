@@ -2,10 +2,21 @@ const { Jimp } = require('jimp');
 const path = require('path');
 
 async function createWelcomeCard(data) {
-    const { username, serverName, memberCount, avatarUrl } = data;
+    const { username, serverName, memberCount, avatarUrl, background } = data;
 
     // Create background (1024x450)
-    const image = new Jimp({ width: 1024, height: 450, color: 0x23272Aff });
+    let image;
+    if (background) {
+        try {
+            image = await Jimp.read(background);
+            image.resize({ width: 1024, height: 450 });
+        } catch (e) {
+            console.error('Failed to load custom welcome background:', e);
+            image = new Jimp({ width: 1024, height: 450, color: 0x23272Aff });
+        }
+    } else {
+        image = new Jimp({ width: 1024, height: 450, color: 0x23272Aff });
+    }
 
     // Load avatar
     let avatar;

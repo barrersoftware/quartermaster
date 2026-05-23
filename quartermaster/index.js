@@ -35,8 +35,12 @@ function loadCommands(dir) {
         } else if (file.endsWith('.js')) {
             const command = require(filePath);
             if (command.name && command.execute) {
+                // Set category based on folder name
+                const category = path.basename(dir);
+                command.category = category;
+                
                 client.commands.set(command.name, command);
-                console.log(`Loaded command: ${command.name}`);
+                console.log(`Loaded command: ${command.name} [${category}]`);
             }
         }
     }
@@ -64,6 +68,27 @@ client.on('interactionCreate', async interaction => {
 
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
+
+    // RBAC - Role Based Access Control
+    const guildId = interaction.guild.id;
+    const settings = db.getGuildSettingsOrDefault(guildId);
+    const modRoles = settings.mod_roles; // Array of role IDs
+
+    const isOwner = interaction.user.id === interaction.guild.ownerId;
+    const isAdmin = interaction.member.permissions.has(GatewayIntentBits.Administrator) || isOwner;
+    const isMod = isAdmin || interaction.member.roles.cache.some(role => modRoles.includes(role.id));
+
+    // Determine category based on file path
+    const commandCategory = command.category || 'general';
+
+    // Enforcement Logic
+    if (commandCategory === 'moderation' && !isMod) {
+        return interaction.reply({ content: '❌ You must be a **Moderator** to use this command.', ephemeral: true });
+    }
+
+    if ((commandCategory === 'raid' || commandCategory === 'utility') && !isAdmin) {
+        return interaction.reply({ content: '❌ You must be an **Administrator** to use this command.', ephemeral: true });
+    }
 
     try {
         await command.execute(interaction);
@@ -98,6 +123,10 @@ try {
 // Load commands and events
 loadCommands(path.join(__dirname, 'commands'));
 loadEvents();
+
+// Start background manager
+const QuartermasterManager = require('./manager');
+client.manager = new QuartermasterManager(client);
 
 // Start web dashboard
 const webServer = require('./web/server');

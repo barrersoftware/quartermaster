@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permissions - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Permissions</span>
+            </div>
+
+            <h1>Role-Based Access Control</h1>
+            <p>Manage who can use specific bot command categories.</p>
+
+            <div class="settings-section">
+                <h2>Moderator Roles</h2>
+                <p>Members with these roles can use commands in the <strong>Moderation</strong> category (Ban, Kick, Mute, Warn).</p>
+                <p><small>Note: Administrators always have Moderator access.</small></p>
+
+                <div class="roles-manager">
+                    <div class="active-roles">
+                        <% if (settings.mod_roles.length === 0) { %>
+                            <p class="muted">No moderator roles designated.</p>
+                        <% } else { %>
+                            <% settings.mod_roles.forEach(roleId => { 
+                                const role = roles.find(r => r.id === roleId); %>
+                                <div class="role-tag" style="border-left: 4px solid <%= role ? role.hexColor : '#ccc' %>">
+                                    <%= role ? role.name : 'Unknown Role' %>
+                                    <button onclick="removeRole('<%= roleId %>')" class="remove-role">&times;</button>
+                                </div>
+                            <% }); %>
+                        <% } %>
+                    </div>
+
+                    <div class="add-role-form">
+                        <select id="role-select" class="input-select">
+                            <option value="">Select a role to add...</option>
+                            <% roles.forEach(role => { %>
+                                <% if (!settings.mod_roles.includes(role.id)) { %>
+                                    <option value="<%= role.id %>"><%= role.name %></option>
+                                <% } %>
+                            <% }); %>
+                        </select>
+                        <button onclick="addRole()" class="btn btn-primary">Add Moderator Role</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h2>Command Categories</h2>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Requirement</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Leveling</td>
+                            <td><span class="badge badge-success">Everyone</span></td>
+                            <td>Rank, Leaderboard, etc.</td>
+                        </tr>
+                        <tr>
+                            <td>Moderation</td>
+                            <td><span class="badge badge-info">Moderator Roles</span></td>
+                            <td>Kick, Ban, Mute, Warn, Auto-mod management.</td>
+                        </tr>
+                        <tr>
+                            <td>Utility / Setup</td>
+                            <td><span class="badge badge-danger">Administrators</span></td>
+                            <td>Server setup, community automation, roles.</td>
+                        </tr>
+                        <tr>
+                            <td>Raid Protection</td>
+                            <td><span class="badge badge-danger">Administrators</span></td>
+                            <td>Anti-raid settings and lockdown.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        async function addRole() {
+            const roleId = document.getElementById('role-select').value;
+            if (!roleId) return;
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/permissions/mod-roles`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roleId })
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function removeRole(roleId) {
+            if (!confirm('Remove this role from moderators?')) return;
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/permissions/mod-roles/${roleId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

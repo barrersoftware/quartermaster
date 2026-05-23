@@ -68,6 +68,11 @@
                             <input type="text" id="colorText" value="<%= settings.rank_card_color || '#5865F2' %>" class="input-field" style="width: 100px;">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>Custom Rank Card Background (URL)</label>
+                        <input type="text" name="rank_background" value="<%= settings.rank_background || '' %>" class="input-field" placeholder="https://example.com/image.png">
+                        <small>Dimensions: 900x250 recommended. Image will be resized.</small>
+                    </div>
                     <button type="submit" class="btn btn-primary">Update Visuals</button>
                 </form>
             </div>

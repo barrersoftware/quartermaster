@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Alerts - <%= guild.name %></title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="dashboard-container">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> /
+                <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
+                <span>Social Alerts</span>
+            </div>
+
+            <h1>Social Media Alerts</h1>
+            <p>Automatically announce when you go live or post new content.</p>
+
+            <div class="settings-section">
+                <h2>Active Alerts</h2>
+                
+                <div class="alerts-list">
+                    <% if (alerts.length === 0) { %>
+                        <p class="muted">No social alerts configured.</p>
+                    <% } else { %>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Platform</th>
+                                    <th>Channel</th>
+                                    <th>Alert Channel</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% alerts.forEach(alert => { %>
+                                    <tr>
+                                        <td>
+                                            <span class="badge badge-<%= alert.platform === 'twitch' ? 'info' : 'danger' %>">
+                                                <%= alert.platform.toUpperCase() %>
+                                            </span>
+                                        </td>
+                                        <td><code><%= alert.channel_name %></code></td>
+                                        <td><#<%= alert.alert_channel_id %>></td>
+                                        <td>
+                                            <button class="btn btn-small btn-danger" onclick="deleteAlert('<%= alert.platform %>', '<%= alert.channel_name %>')">Delete</button>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    <% } %>
+                </div>
+
+                <div class="add-trigger-box">
+                    <h3>Add New Alert</h3>
+                    <form id="addAlertForm">
+                        <div class="form-group">
+                            <label>Platform</label>
+                            <select name="platform" class="input-select" required>
+                                <option value="twitch">Twitch</option>
+                                <option value="youtube">YouTube</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Channel Name / ID</label>
+                            <input type="text" name="channel" class="input-field" placeholder="e.g. g4turbo" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Discord Alert Channel</label>
+                            <select name="alert_channel_id" class="input-select" required>
+                                <% channels.forEach(ch => { %>
+                                    <option value="<%= ch.id %>">#<%= ch.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Social Alert</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+
+        document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/social`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        async function deleteAlert(platform, channel) {
+            if (!confirm(`Delete ${platform} alert for "${channel}"?`)) return;
+
+            try {
+                const response = await fetch(`/api/server/${guildId}/social/${platform}/${encodeURIComponent(channel)}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) location.reload();
+                else alert(result.error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

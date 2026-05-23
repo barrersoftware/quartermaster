@@ -3,127 +3,100 @@ const db = require('../database');
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
-        // Ignore bot messages
-        if (message.author.bot) return;
+        // 1. Basic Filters
+        if (message.author.bot || !message.guild) return;
 
-        // Ignore DMs
-        if (!message.guild) return;
-
-        // Check auto-moderation first
+        // 2. Auto-Moderation (High Priority)
         const automodCommand = client.commands.get('automod');
         if (automodCommand && automodCommand.checkMessage) {
             const blocked = await automodCommand.checkMessage(message, client);
-            if (blocked) return; // Message was blocked by auto-mod
+            if (blocked) return;
         }
 
         const config = client.config;
         const prefix = process.env.PREFIX || '!';
 
-        // Handle XP gain
+        // 3. Leveling & XP System
         if (config.leveling.enabled) {
             try {
                 const userId = message.author.id;
                 const guildId = message.guild.id;
-
-                // Get user data
                 const userData = db.getUserData.get(userId, guildId);
-
-                // Check cooldown
                 const now = Date.now();
+
                 if (!userData || now - userData.last_message >= config.leveling.cooldown * 1000) {
-                    // Base XP
-                    let xpGain = Math.floor(
-                        Math.random() * (config.leveling.xpPerMessage.max - config.leveling.xpPerMessage.min + 1)
-                    ) + config.leveling.xpPerMessage.min;
+                    let xpGain = Math.floor(Math.random() * (config.leveling.xpPerMessage.max - config.leveling.xpPerMessage.min + 1)) + config.leveling.xpPerMessage.min;
 
                     // Apply Multipliers
                     const multipliers = db.getMultipliers.all(guildId);
                     let totalMultiplier = 1.0;
-
                     for (const m of multipliers) {
-                        if (m.type === 'channel' && m.target_id === message.channel.id) {
-                            totalMultiplier = Math.max(totalMultiplier, m.multiplier);
-                        } else if (m.type === 'role' && message.member.roles.cache.has(m.target_id)) {
+                        if ((m.type === 'channel' && m.target_id === message.channel.id) || 
+                            (m.type === 'role' && message.member.roles.cache.has(m.target_id))) {
                             totalMultiplier = Math.max(totalMultiplier, m.multiplier);
                         }
                     }
-
                     xpGain = Math.floor(xpGain * totalMultiplier);
 
                     const result = db.addXP(userId, guildId, xpGain);
 
-                    // Handle level up
                     if (result.leveledUp) {
-                        const levelUpMsg = config.leveling.levelUpMessage
-                            .replace('{user}', `<@${userId}>`)
-                            .replace('{level}', result.newLevel);
-
+                        const levelUpMsg = config.leveling.levelUpMessage.replace('{user}', `<@${userId}>`).replace('{level}', result.newLevel);
                         await message.channel.send(levelUpMsg);
 
-                        // Check for role rewards from database
                         const roleReward = db.getRoleRewardForLevel.get(guildId, result.newLevel);
                         if (roleReward) {
                             const role = message.guild.roles.cache.get(roleReward.role_id);
-                            if (role) {
-                                try {
-                                    await message.member.roles.add(role);
-                                    await message.channel.send(`🎉 <@${userId}> earned the ${role} role for reaching level ${result.newLevel}!`);
-                                } catch (error) {
-                                    console.error('Error assigning role reward:', error);
-                                }
-                            }
+                            if (role) await message.member.roles.add(role).catch(e => console.error('Role assign error:', e));
                         }
                     }
                 }
-            } catch (error) {
-                console.error('Error handling XP:', error);
-            }
+            } catch (error) { console.error('XP Error:', error); }
         }
 
-        // Handle commands
+        // 4. Advanced Triggers (No prefix required)
         if (!message.content.startsWith(prefix)) {
-            // Check for custom commands
-            const customCommand = message.content.toLowerCase();
-            if (customCommand.startsWith(prefix)) {
-                const commandName = customCommand.slice(prefix.length).split(' ')[0];
-                const cmd = db.getCustomCommand.get(message.guild.id, commandName);
+            try {
+                const triggers = db.getTriggers.all(message.guild.id);
+                const content = message.content.toLowerCase();
 
-                if (cmd) {
-                    await message.channel.send(cmd.response);
+                for (const trigger of triggers) {
+                    if (content.includes(trigger.trigger_phrase.toLowerCase())) {
+                        if (trigger.type === 'embed') {
+                            const { EmbedBuilder } = require('discord.js');
+                            const embed = new EmbedBuilder().setColor('#5865F2').setDescription(trigger.response).setTimestamp();
+                            await message.reply({ embeds: [embed] });
+                        } else {
+                            await message.reply(trigger.response);
+                        }
+                        return;
+                    }
                 }
-            }
-            return;
+            } catch (error) { console.error('Trigger Error:', error); }
         }
 
-        const args = message.content.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
+        // 5. Prefix Commands & Custom Commands
+        if (message.content.startsWith(prefix)) {
+            const args = message.content.slice(prefix.length).trim().split(/ +/);
+            const commandName = args.shift().toLowerCase();
 
-        // Try to find command
-        const command = client.commands.get(commandName) ||
-            client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
+            const command = client.commands.get(commandName) || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 
-        if (!command) {
-            // Check for custom command
-            const customCmd = db.getCustomCommand.get(message.guild.id, commandName);
-            if (customCmd) {
-                await message.channel.send(customCmd.response);
+            if (command) {
+                if (command.permissions && !message.member.permissions.has(command.permissions)) {
+                    return message.reply('You do not have permission to use this command!');
+                }
+                try {
+                    await command.execute(message, args, client);
+                } catch (error) {
+                    console.error(`Exec error (${commandName}):`, error);
+                    await message.reply('There was an error executing that command!');
+                }
+            } else {
+                // Check for custom command if built-in not found
+                const customCmd = db.getCustomCommand.get(message.guild.id, commandName);
+                if (customCmd) await message.channel.send(customCmd.response);
             }
-            return;
-        }
-
-        // Check permissions
-        if (command.permissions) {
-            if (!message.member.permissions.has(command.permissions)) {
-                return message.reply('You do not have permission to use this command!');
-            }
-        }
-
-        // Execute command
-        try {
-            await command.execute(message, args, client);
-        } catch (error) {
-            console.error(`Error executing ${commandName}:`, error);
-            await message.reply('There was an error executing that command!');
         }
     }
 };

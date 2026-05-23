@@ -188,6 +188,48 @@ router.get('/server/:guildId/commands', (req, res) => {
     });
 });
 
+// Advanced Triggers
+router.get('/server/:guildId/triggers', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const triggers = db.getTriggers.all(guildId);
+
+    res.render('dashboard/triggers', {
+        user: req.user,
+        guild: guild,
+        triggers: triggers
+    });
+});
+
+// Social Media Alerts
+router.get('/server/:guildId/social', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const channels = Array.from(guild.channels.cache.values())
+        .filter(channel => channel.type === 0);
+
+    const alerts = db.getSocialAlerts.all(guildId);
+
+    res.render('dashboard/social', {
+        user: req.user,
+        guild: guild,
+        channels: channels,
+        alerts: alerts
+    });
+});
+
 // Welcome settings
 router.get('/server/:guildId/welcome', (req, res) => {
     const guildId = req.params.guildId;
@@ -218,6 +260,30 @@ router.get('/server/:guildId/welcome', (req, res) => {
 });
 
 
+// Reaction roles
+router.get('/server/:guildId/reaction-roles', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const roles = Array.from(guild.roles.cache.values())
+        .filter(role => role.name !== '@everyone')
+        .sort((a, b) => b.position - a.position);
+
+    const reactionRoles = db.getReactionRoles.all(guildId);
+
+    res.render('dashboard/reaction-roles', {
+        user: req.user,
+        guild: guild,
+        roles: roles,
+        reactionRoles: reactionRoles
+    });
+});
+
 // Moderation logs
 router.get('/server/:guildId/moderation', (req, res) => {
     const guildId = req.params.guildId;
@@ -241,6 +307,30 @@ router.get('/server/:guildId/moderation', (req, res) => {
         warnings: allWarnings,
         automod: automodSettings,
         blacklist: blacklist
+    });
+});
+
+// Permissions view
+router.get('/server/:guildId/permissions', (req, res) => {
+    const guildId = req.params.guildId;
+    const client = req.app.locals.client;
+    const guild = client ? client.guilds.cache.get(guildId) : null;
+
+    if (!guild) {
+        return res.status(404).send('Bot not in guild');
+    }
+
+    const roles = Array.from(guild.roles.cache.values())
+        .filter(role => role.name !== '@everyone')
+        .sort((a, b) => b.position - a.position);
+
+    const settings = db.getGuildSettingsOrDefault(guildId);
+
+    res.render('dashboard/permissions', {
+        user: req.user,
+        guild: guild,
+        roles: roles,
+        settings: settings
     });
 });
 

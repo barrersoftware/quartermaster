@@ -20,6 +20,10 @@ module.exports = {
         const raid = db.getRaidSettingsOrDefault(guildId);
         const multipliers = db.getMultipliers.all(guildId);
         const rewards = db.getRoleRewards.all(guildId);
+        const triggers = db.getTriggers.all(guildId);
+        const reactionRoles = db.getReactionRoles.all(guildId);
+        const activeGiveaways = db.getGiveaways.all(guildId);
+        const socialAlerts = db.getSocialAlerts.all(guildId);
         const allUsers = db.getLeaderboard.all(guildId, 999999);
 
         const activeProtections = [];
@@ -40,7 +44,8 @@ module.exports = {
                 { name: '📈 Total XP', value: `${totalXP.toLocaleString()}`, inline: true },
                 { name: '🏆 Active Chatters', value: `${allUsers.length}`, inline: true },
                 { name: '🛡️ Active Protections', value: activeProtections.length > 0 ? activeProtections.join('\n') : 'No protections active', inline: false },
-                { name: '💎 Leveling Info', value: `Multipliers: ${multipliers.length}\nRewards: ${rewards.length}`, inline: true },
+                { name: '💎 Engagement', value: `Triggers: ${triggers.length}\nReaction Roles: ${reactionRoles.length}\nGiveaways: ${activeGiveaways.length}\nSocial Alerts: ${socialAlerts.length}`, inline: true },
+                { name: '📊 Leveling', value: `Multipliers: ${multipliers.length}\nRewards: ${rewards.length}`, inline: true },
                 { name: '📅 Created', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true }
             )
             .setFooter({ text: 'Quartermaster Pro • MEE6 Alternative' })

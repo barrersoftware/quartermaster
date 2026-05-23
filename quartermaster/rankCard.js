@@ -2,10 +2,22 @@ const { Jimp } = require('jimp');
 const path = require('path');
 
 async function createRankCard(data) {
-    const { username, level, rank, currentXp, requiredXp, avatarUrl, color } = data;
+    const { username, level, rank, currentXp, requiredXp, avatarUrl, color, background } = data;
 
     // Create a canvas-like background (900x250)
-    const image = new Jimp({ width: 900, height: 250, color: 0x23272Aff });
+    let image;
+    if (background) {
+        try {
+            image = await Jimp.read(background);
+            image.resize({ width: 900, height: 250 });
+        } catch (e) {
+            console.error('Failed to load custom rank background:', e);
+            image = new Jimp({ width: 900, height: 250, color: 0x23272Aff });
+        }
+    } else {
+        image = new Jimp({ width: 900, height: 250, color: 0x23272Aff });
+    }
+
     const themeColor = color ? parseInt(color.replace('#', ''), 16) * 256 + 0xFF : 0x5865F2ff;
 
     // Load avatar

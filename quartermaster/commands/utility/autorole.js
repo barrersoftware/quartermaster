@@ -22,7 +22,16 @@ module.exports = {
         // Handle disabling
         if (!role && !isInteraction && args[0] === 'off') {
             const settings = db.getGuildSettingsOrDefault(guildId);
-            db.setGuildSetting.run(guildId, settings.welcome_channel, settings.leave_channel, settings.log_channel, settings.mute_role, settings.rank_card_color, null);
+            db.setGuildSetting.run(
+                guildId, 
+                settings.welcome_channel, 
+                settings.leave_channel, 
+                settings.log_channel, 
+                settings.mute_role, 
+                settings.rank_card_color, 
+                null,
+                JSON.stringify(settings.mod_roles)
+            );
             return interaction.reply('✅ Auto-role has been disabled.');
         }
 
@@ -36,7 +45,8 @@ module.exports = {
             settings.log_channel, 
             settings.mute_role, 
             settings.rank_card_color, 
-            roleId
+            roleId,
+            JSON.stringify(settings.mod_roles)
         );
 
         if (roleId) {
