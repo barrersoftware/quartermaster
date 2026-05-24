@@ -251,14 +251,21 @@ router.post('/server/:guildId/automod', (req, res) => {
         if (req.body.links_enabled !== undefined) settings.links_enabled = parseInt(req.body.links_enabled);
         if (req.body.invites_enabled !== undefined) settings.invites_enabled = parseInt(req.body.invites_enabled);
         if (req.body.badwords_enabled !== undefined) settings.badwords_enabled = parseInt(req.body.badwords_enabled);
+        
+        if (req.body.emoji_spam_enabled !== undefined) settings.emoji_spam_enabled = parseInt(req.body.emoji_spam_enabled);
+        if (req.body.emoji_threshold !== undefined) settings.emoji_threshold = parseInt(req.body.emoji_threshold);
+        if (req.body.caps_spam_enabled !== undefined) settings.caps_spam_enabled = parseInt(req.body.caps_spam_enabled);
+        if (req.body.caps_threshold !== undefined) settings.caps_threshold = parseInt(req.body.caps_threshold);
+        if (req.body.mention_spam_enabled !== undefined) settings.mention_spam_enabled = parseInt(req.body.mention_spam_enabled);
+        if (req.body.mention_threshold !== undefined) settings.mention_threshold = parseInt(req.body.mention_threshold);
 
         db.setAutomodSettings.run(
             guildId,
-            settings.spam_enabled,
-            settings.spam_threshold,
-            settings.links_enabled,
-            settings.invites_enabled,
-            settings.badwords_enabled
+            settings.spam_enabled, settings.spam_threshold,
+            settings.links_enabled, settings.invites_enabled, settings.badwords_enabled,
+            settings.emoji_spam_enabled, settings.emoji_threshold,
+            settings.caps_spam_enabled, settings.caps_threshold,
+            settings.mention_spam_enabled, settings.mention_threshold
         );
 
         res.json({ success: true });

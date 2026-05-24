@@ -55,6 +55,39 @@
                                 <option value="0" <%= !automod.badwords_enabled ? 'selected' : '' %>>Disabled</option>
                             </select>
                         </div>
+                        <div class="setting-item">
+                            <label>Emoji Spam Protection</label>
+                            <select name="emoji_spam_enabled" class="input-select">
+                                <option value="1" <%= automod.emoji_spam_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.emoji_spam_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Emoji Threshold (Max emojis)</label>
+                            <input type="number" name="emoji_threshold" value="<%= automod.emoji_threshold %>" class="input-field">
+                        </div>
+                        <div class="setting-item">
+                            <label>Caps Spam Protection</label>
+                            <select name="caps_spam_enabled" class="input-select">
+                                <option value="1" <%= automod.caps_spam_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.caps_spam_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Caps Threshold (%)</label>
+                            <input type="number" name="caps_threshold" value="<%= automod.caps_threshold %>" class="input-field" min="1" max="100">
+                        </div>
+                        <div class="setting-item">
+                            <label>Mention Spam Protection</label>
+                            <select name="mention_spam_enabled" class="input-select">
+                                <option value="1" <%= automod.mention_spam_enabled ? 'selected' : '' %>>Enabled</option>
+                                <option value="0" <%= !automod.mention_spam_enabled ? 'selected' : '' %>>Disabled</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>Mention Threshold (Max pings)</label>
+                            <input type="number" name="mention_threshold" value="<%= automod.mention_threshold %>" class="input-field">
+                        </div>
                         <button type="submit" class="btn btn-primary">Save Auto-Mod Settings</button>
                     </form>
                 </div>
