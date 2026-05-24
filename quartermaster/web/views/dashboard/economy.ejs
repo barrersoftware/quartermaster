@@ -21,8 +21,9 @@
             <p>Manage the server currency and items members can buy with Pirate Gold.</p>
 
             <div class="settings-grid">
+                <!-- 1. Shop Inventory -->
                 <div class="settings-section">
-                    <h2>Shop Items</h2>
+                    <h2>Shop Inventory</h2>
                     <div class="shop-list">
                         <% if (shopItems.length === 0) { %>
                             <p class="muted">The shop is currently empty.</p>
@@ -39,8 +40,8 @@
                                 <tbody>
                                     <% shopItems.forEach(item => { %>
                                         <tr>
-                                            <td><strong><%= item.name %></strong><br><small><%= item.description %></small></td>
-                                            <td>💰 <%= item.price.toLocaleString() %></td>
+                                            <td><strong><%= item.name %></strong><br><small class="muted"><%= item.description %></small></td>
+                                            <td><strong style="color: #FFD700;">💰 <%= item.price.toLocaleString() %></strong></td>
                                             <td>
                                                 <% if (item.role_id) { 
                                                     const role = roles.find(r => r.id === item.role_id); %>
@@ -62,32 +63,36 @@
                     </div>
                 </div>
 
+                <!-- 2. Add Item -->
                 <div class="settings-section">
-                    <h2>Add New Item</h2>
-                    <form id="addItemForm">
-                        <div class="form-group">
-                            <label>Item Name</label>
-                            <input type="text" name="name" class="input-field" placeholder="e.g. VIP Member" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <input type="text" name="description" class="input-field" placeholder="What does this item do?">
-                        </div>
-                        <div class="form-group">
-                            <label>Price (Pirate Gold)</label>
-                            <input type="number" name="price" class="input-field" value="1000" min="1" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Role to Award (Optional)</label>
-                            <select name="role_id" class="input-select">
-                                <option value="">None</option>
-                                <% roles.forEach(role => { %>
-                                    <option value="<%= role.id %>">@<%= role.name %></option>
-                                <% }); %>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Add to Shop</button>
-                    </form>
+                    <h2>Stock the Store</h2>
+                    <p>Create new items for members to purchase.</p>
+                    <div class="add-box" style="padding: 20px; background: rgba(0,0,0,0.1); border-radius: 8px; margin-top: 15px;">
+                        <form id="addItemForm">
+                            <div class="form-group">
+                                <label>Item Name</label>
+                                <input type="text" name="name" class="input-field" placeholder="e.g. VIP Member" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <input type="text" name="description" class="input-field" placeholder="What does this item do?">
+                            </div>
+                            <div class="form-group">
+                                <label>Price (Pirate Gold)</label>
+                                <input type="number" name="price" class="input-field" value="1000" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Role to Award (Optional)</label>
+                                <select name="role_id" class="input-select">
+                                    <option value="">None (Custom Item)</option>
+                                    <% roles.forEach(role => { %>
+                                        <option value="<%= role.id %>">@<%= role.name %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">Add to Shop</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -113,9 +118,10 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to add item', 'error');
             }
         });
 
@@ -128,10 +134,18 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to remove item', 'error');
             }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
     </script>
 </body>

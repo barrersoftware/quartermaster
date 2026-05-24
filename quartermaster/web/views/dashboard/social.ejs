@@ -18,7 +18,7 @@
             </div>
 
             <h1>Social Media Alerts</h1>
-            <p>Automatically announce when you go live or post new content.</p>
+            <p>Automatically announce to your server when you go live on Twitch or upload to YouTube.</p>
 
             <div class="settings-section">
                 <h2>Active Alerts</h2>
@@ -31,8 +31,8 @@
                             <thead>
                                 <tr>
                                     <th>Platform</th>
-                                    <th>Channel</th>
-                                    <th>Alert Channel</th>
+                                    <th>Channel / ID</th>
+                                    <th>Discord Alert Channel</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -40,14 +40,14 @@
                                 <% alerts.forEach(alert => { %>
                                     <tr>
                                         <td>
-                                            <span class="badge badge-<%= alert.platform === 'twitch' ? 'info' : 'danger' %>">
+                                            <span class="badge <%= alert.platform === 'twitch' ? 'badge-info' : 'badge-danger' %>">
                                                 <%= alert.platform.toUpperCase() %>
                                             </span>
                                         </td>
                                         <td><code><%= alert.channel_name %></code></td>
-                                        <td><#<%= alert.alert_channel_id %>></td>
+                                        <td>#<%= channels.find(c => c.id === alert.alert_channel_id)?.name || alert.alert_channel_id %></td>
                                         <td>
-                                            <button class="btn btn-small btn-danger" onclick="deleteAlert('<%= alert.platform %>', '<%= alert.channel_name %>')">Delete</button>
+                                            <button class="btn btn-small btn-danger" onclick="deleteAlert('<%= alert.platform %>', '<%= alert.channel_name %>')">Remove</button>
                                         </td>
                                     </tr>
                                 <% }); %>
@@ -56,9 +56,9 @@
                     <% } %>
                 </div>
 
-                <div class="add-trigger-box">
+                <div class="add-box" style="margin-top: 2rem; padding: 25px; background: rgba(0,0,0,0.1); border-radius: 8px;">
                     <h3>Add New Alert</h3>
-                    <form id="addAlertForm">
+                    <form id="addAlertForm" class="form-row" style="margin-top: 15px;">
                         <div class="form-group">
                             <label>Platform</label>
                             <select name="platform" class="input-select" required>
@@ -78,7 +78,9 @@
                                 <% }); %>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary">Add Social Alert</button>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Add Alert</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -105,9 +107,10 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to add social alert', 'error');
             }
         });
 
@@ -120,10 +123,18 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to remove social alert', 'error');
             }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
     </script>
 </body>

@@ -18,7 +18,7 @@
             </div>
 
             <h1>Reaction Roles</h1>
-            <p>Assign roles to members when they react to a specific message.</p>
+            <p>Automatically assign roles to members when they react to specific messages with emojis.</p>
 
             <div class="settings-section">
                 <h2>Active Reaction Roles</h2>
@@ -32,7 +32,7 @@
                                 <tr>
                                     <th>Message ID</th>
                                     <th>Emoji</th>
-                                    <th>Role</th>
+                                    <th>Assigned Role</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -41,10 +41,14 @@
                                     const role = roles.find(r => r.id === rr.role_id); %>
                                     <tr>
                                         <td><code><%= rr.message_id %></code></td>
-                                        <td><%= rr.emoji %></td>
-                                        <td><span class="role-badge" style="background-color: <%= role ? role.hexColor : '#99AAB5' %>">@<%= role ? role.name : rr.role_id %></span></td>
+                                        <td style="font-size: 1.2rem;"><%= rr.emoji %></td>
                                         <td>
-                                            <button class="btn btn-small btn-danger" onclick="deleteReactionRole('<%= rr.message_id %>', '<%= rr.emoji %>')">Delete</button>
+                                            <span class="role-badge" style="background-color: <%= role ? role.hexColor : '#99AAB5' %>">
+                                                @<%= role ? role.name : rr.role_id %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-small btn-danger" onclick="deleteReactionRole('<%= rr.message_id %>', '<%= rr.emoji %>')">Remove</button>
                                         </td>
                                     </tr>
                                 <% }); %>
@@ -53,16 +57,16 @@
                     <% } %>
                 </div>
 
-                <div class="add-trigger-box">
-                    <h3>Add New Reaction Role</h3>
-                    <form id="addReactionRoleForm">
+                <div class="add-box" style="margin-top: 2rem; padding: 25px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                    <h3>Create New Reaction Role</h3>
+                    <form id="addReactionRoleForm" class="form-row" style="margin-top: 15px;">
                         <div class="form-group">
                             <label>Message ID</label>
                             <input type="text" name="message_id" class="input-field" placeholder="Right click message -> Copy ID" required>
                         </div>
                         <div class="form-group">
                             <label>Emoji</label>
-                            <input type="text" name="emoji" class="input-field" placeholder="e.g. ✅ or :custom_emoji:" required>
+                            <input type="text" name="emoji" class="input-field" placeholder="e.g. ✅" required>
                         </div>
                         <div class="form-group">
                             <label>Role to Award</label>
@@ -73,7 +77,9 @@
                                 <% }); %>
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary">Create Reaction Role</button>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Create</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -100,14 +106,15 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to create reaction role', 'error');
             }
         });
 
         async function deleteReactionRole(messageId, emoji) {
-            if (!confirm(`Delete this reaction role?`)) return;
+            if (!confirm(`Delete this reaction role mapping?`)) return;
 
             try {
                 const response = await fetch(`/api/server/${guildId}/reaction-roles/${messageId}/${encodeURIComponent(emoji)}`, {
@@ -115,10 +122,18 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to remove reaction role', 'error');
             }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
     </script>
 </body>

@@ -19,6 +19,7 @@
 
             <h1>Leveling Settings</h1>
 
+            <!-- 1. General Settings -->
             <div class="settings-section">
                 <h2>General Settings</h2>
                 <form id="levelingForm">
@@ -33,23 +34,23 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Minimum XP per Message</label>
-                            <input type="number" name="xpMin" value="<%= config.leveling.xpPerMessage.min %>" min="1" max="100">
+                            <input type="number" name="xpMin" value="<%= config.leveling.xpPerMessage.min %>" min="1" max="100" class="input-field">
                         </div>
                         <div class="form-group">
                             <label>Maximum XP per Message</label>
-                            <input type="number" name="xpMax" value="<%= config.leveling.xpPerMessage.max %>" min="1" max="100">
+                            <input type="number" name="xpMax" value="<%= config.leveling.xpPerMessage.max %>" min="1" max="100" class="input-field">
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>XP Cooldown (seconds)</label>
-                        <input type="number" name="cooldown" value="<%= config.leveling.cooldown %>" min="0" max="3600">
+                        <input type="number" name="cooldown" value="<%= config.leveling.cooldown %>" min="0" max="3600" class="input-field">
                         <small>Time users must wait between gaining XP</small>
                     </div>
 
                     <div class="form-group">
                         <label>Level Up Message</label>
-                        <input type="text" name="levelUpMessage" value="<%= config.leveling.levelUpMessage %>">
+                        <input type="text" name="levelUpMessage" value="<%= config.leveling.levelUpMessage %>" class="input-field">
                         <small>Use {user} for mention, {level} for level number</small>
                     </div>
 
@@ -57,6 +58,25 @@
                 </form>
             </div>
 
+            <!-- 2. Level Up Announcements -->
+            <div class="settings-section">
+                <h2>Level Up Announcements</h2>
+                <form id="announcementForm">
+                    <div class="form-group">
+                        <label>Announcement Channel</label>
+                        <select name="level_up_channel" class="input-select">
+                            <option value="">In the channel where it happened (Current Channel)</option>
+                            <% channels.forEach(ch => { %>
+                                <option value="<%= ch.id %>" <%= settings.level_up_channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+                            <% }); %>
+                        </select>
+                        <small>Choose where the bot should post level-up messages.</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Announcement Settings</button>
+                </form>
+            </div>
+
+            <!-- 3. Visual Customization -->
             <div class="settings-section">
                 <h2>Visual Customization</h2>
                 <p>Customize how rank cards look in your server</p>
@@ -77,6 +97,7 @@
                 </form>
             </div>
 
+            <!-- 4. XP Multipliers -->
             <div class="settings-section">
                 <h2>XP Multipliers</h2>
                 <p>Give extra XP for specific roles or channels (e.g., 2.0 for double XP)</p>
@@ -85,80 +106,125 @@
                     <% if (multipliers.length === 0) { %>
                         <p class="muted">No multipliers configured.</p>
                     <% } else { %>
-                        <% multipliers.forEach(m => { %>
-                            <div class="multiplier-item">
-                                <span class="type-badge <%= m.type %>"><%= m.type.toUpperCase() %></span>
-                                <span>
-                                    <% if (m.type === 'role') { 
-                                        const role = roles.find(r => r.id === m.target_id); %>
-                                        <%= role ? role.name : m.target_id %>
-                                    <% } else { 
-                                        const channel = channels.find(c => c.id === m.target_id); %>
-                                        #<%= channel ? channel.name : m.target_id %>
-                                    <% } %>
-                                </span>
-                                <span class="multiplier-value"><%= m.multiplier %>x</span>
-                                <button class="btn btn-small btn-danger" onclick="removeMultiplier('<%= m.target_id %>', '<%= m.type %>')">Remove</button>
-                            </div>
-                        <% }); %>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Target</th>
+                                    <th>Value</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% multipliers.forEach(m => { %>
+                                    <tr>
+                                        <td><span class="type-badge <%= m.type %>"><%= m.type.toUpperCase() %></span></td>
+                                        <td>
+                                            <% if (m.type === 'role') { 
+                                                const role = roles.find(r => r.id === m.target_id); %>
+                                                <%= role ? role.name : m.target_id %>
+                                            <% } else { 
+                                                const channel = channels.find(c => c.id === m.target_id); %>
+                                                #<%= channel ? channel.name : m.target_id %>
+                                            <% } %>
+                                        </td>
+                                        <td><strong><%= m.multiplier %>x</strong></td>
+                                        <td>
+                                            <button class="btn btn-small btn-danger" onclick="removeMultiplier('<%= m.target_id %>', '<%= m.type %>')">Remove</button>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
                     <% } %>
                 </div>
 
-                <form id="addMultiplierForm" class="form-inline">
-                    <div class="form-group">
-                        <label>Type</label>
-                        <select name="type" id="multType" required>
-                            <option value="role">Role</option>
-                            <option value="channel">Channel</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Target</label>
-                        <select name="target_id" id="multTarget" required>
-                            <!-- Populated by JS -->
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Multiplier</label>
-                        <input type="number" name="multiplier" step="0.1" min="0.1" max="10.0" value="2.0" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Add Multiplier</button>
-                </form>
+                <div class="add-box" style="margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                    <h3>Add New Multiplier</h3>
+                    <form id="addMultiplierForm" class="form-row">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select name="type" id="multType" class="input-select" required>
+                                <option value="role">Role</option>
+                                <option value="channel">Channel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Target</label>
+                            <select name="target_id" id="multTarget" class="input-select" required>
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Multiplier</label>
+                            <input type="number" name="multiplier" step="0.1" min="0.1" max="10.0" value="2.0" class="input-field" required>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Add</button>
+                        </div>
+                    </form>
+                </div>
             </div>
 
+            <!-- 5. Role Rewards -->
             <div class="settings-section">
+                <h2>Role Rewards</h2>
                 <p>Automatically give roles when members reach certain levels</p>
 
                 <div class="role-rewards-list">
-                    <% Object.entries(config.leveling.roleRewards).forEach(([level, roleId]) => {
-                        const role = roles.find(r => r.id === roleId || r.name === roleId);
-                    %>
-                        <div class="role-reward-item">
-                            <span>Level <%= level %></span>
-                            <span class="role-badge" style="background-color: <%= role ? '#' + role.color.toString(16).padStart(6, '0') : '#99AAB5' %>">
-                                <%= role ? role.name : roleId %>
-                            </span>
-                            <button class="btn btn-small btn-danger" onclick="removeRoleReward(<%= level %>)">Remove</button>
-                        </div>
-                    <% }); %>
+                    <% if (Object.keys(config.leveling.roleRewards).length === 0) { %>
+                        <p class="muted">No role rewards configured.</p>
+                    <% } else { %>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Level</th>
+                                    <th>Role Reward</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% Object.entries(config.leveling.roleRewards).sort((a,b) => a[0] - b[0]).forEach(([level, roleId]) => {
+                                    const role = roles.find(r => r.id === roleId || r.name === roleId);
+                                %>
+                                    <tr>
+                                        <td><strong>Level <%= level %></strong></td>
+                                        <td>
+                                            <span class="role-badge" style="background-color: <%= role ? role.hexColor : '#99AAB5' %>">
+                                                @<%= role ? role.name : roleId %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-small btn-danger" onclick="removeRoleReward(<%= level %>)">Remove</button>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    <% } %>
                 </div>
 
-                <form id="addRoleRewardForm" class="form-inline">
-                    <div class="form-group">
-                        <label>Level</label>
-                        <input type="number" name="level" min="1" max="100" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Role</label>
-                        <select name="roleId" required>
-                            <option value="">Select a role...</option>
-                            <% roles.forEach(role => { %>
-                                <option value="<%= role.id %>"><%= role.name %></option>
-                            <% }); %>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Add Role Reward</button>
-                </form>
+                <div class="add-box" style="margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                    <h3>Add New Role Reward</h3>
+                    <form id="addRoleRewardForm" class="form-row">
+                        <div class="form-group">
+                            <label>Level</label>
+                            <input type="number" name="level" min="1" max="100" class="input-field" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Role</label>
+                            <select name="roleId" class="input-select" required>
+                                <option value="">Select a role...</option>
+                                <% roles.forEach(role => { %>
+                                    <option value="<%= role.id %>">@<%= role.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary">Add Reward</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -197,6 +263,38 @@
         colorInput.addEventListener('input', () => colorText.value = colorInput.value.toUpperCase());
         colorText.addEventListener('input', () => colorInput.value = colorText.value);
 
+        // Handle leveling form
+        document.getElementById('levelingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/leveling`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    enabled: formData.get('enabled') === 'on',
+                    xpMin: formData.get('xpMin'),
+                    xpMax: formData.get('xpMax'),
+                    cooldown: formData.get('cooldown'),
+                    levelUpMessage: formData.get('levelUpMessage')
+                })
+            });
+            const data = await response.json();
+            showNotification(data.message, response.ok ? 'success' : 'error');
+        });
+
+        // Handle announcement form
+        document.getElementById('announcementForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/settings/announcements`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            const data = await response.json();
+            showNotification(data.success ? 'Announcement settings updated!' : 'Update failed', data.success ? 'success' : 'error');
+        });
+
         // Handle visual form
         document.getElementById('visualForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -234,32 +332,10 @@
             else showNotification('Failed to remove multiplier', 'error');
         }
 
-        // Handle leveling form submission
-        document.getElementById('levelingForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-
-            const response = await fetch(`/api/server/${guildId}/leveling`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    enabled: formData.get('enabled') === 'on',
-                    xpMin: formData.get('xpMin'),
-                    xpMax: formData.get('xpMax'),
-                    cooldown: formData.get('cooldown'),
-                    levelUpMessage: formData.get('levelUpMessage')
-                })
-            });
-
-            const data = await response.json();
-            showNotification(data.message, response.ok ? 'success' : 'error');
-        });
-
         // Handle add role reward form
         document.getElementById('addRoleRewardForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-
             const response = await fetch(`/api/server/${guildId}/leveling/role-reward`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -268,32 +344,21 @@
                     roleId: formData.get('roleId')
                 })
             });
-
             const data = await response.json();
             showNotification(data.message, response.ok ? 'success' : 'error');
-
-            if (response.ok) {
-                setTimeout(() => location.reload(), 1000);
-            }
+            if (response.ok) setTimeout(() => location.reload(), 1000);
         });
 
-        // Remove role reward
         async function removeRoleReward(level) {
             if (!confirm(`Remove role reward for level ${level}?`)) return;
-
             const response = await fetch(`/api/server/${guildId}/leveling/role-reward/${level}`, {
                 method: 'DELETE'
             });
-
             const data = await response.json();
             showNotification(data.message, response.ok ? 'success' : 'error');
-
-            if (response.ok) {
-                setTimeout(() => location.reload(), 1000);
-            }
+            if (response.ok) setTimeout(() => location.reload(), 1000);
         }
 
-        // Show notification
         function showNotification(message, type) {
             const notification = document.getElementById('notification');
             notification.textContent = message;

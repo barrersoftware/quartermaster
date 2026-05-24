@@ -14,25 +14,25 @@
             <div class="breadcrumb">
                 <a href="/dashboard">Dashboard</a> /
                 <a href="/dashboard/server/<%= guild.id %>"><%= guild.name %></a> /
-                <span>Triggers</span>
+                <span>Advanced Triggers</span>
             </div>
 
             <h1>Advanced Triggers</h1>
-            <p>Automatically respond to specific phrases without requiring a prefix.</p>
+            <p>Define automated responses when members type specific phrases (no prefix required).</p>
 
             <div class="settings-section">
-                <h2>Manage Triggers</h2>
+                <h2>Active Triggers</h2>
                 
                 <div class="triggers-list">
                     <% if (triggers.length === 0) { %>
-                        <p class="muted">No triggers configured.</p>
+                        <p class="muted">No advanced triggers configured.</p>
                     <% } else { %>
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>Trigger Phrase</th>
-                                    <th>Type</th>
                                     <th>Response</th>
+                                    <th>Type</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -40,8 +40,8 @@
                                 <% triggers.forEach(trigger => { %>
                                     <tr>
                                         <td><code><%= trigger.trigger_phrase %></code></td>
-                                        <td><span class="badge badge-info"><%= trigger.type %></span></td>
-                                        <td class="text-truncate" style="max-width: 300px;"><%= trigger.response %></td>
+                                        <td><div class="truncate" style="max-width: 300px;"><%= trigger.response %></div></td>
+                                        <td><span class="badge <%= trigger.type === 'embed' ? 'badge-info' : 'badge-secondary' %>"><%= trigger.type.toUpperCase() %></span></td>
                                         <td>
                                             <button class="btn btn-small btn-danger" onclick="deleteTrigger('<%= trigger.trigger_phrase %>')">Delete</button>
                                         </td>
@@ -52,12 +52,16 @@
                     <% } %>
                 </div>
 
-                <div class="add-trigger-box">
+                <div class="add-box" style="margin-top: 2rem; padding: 25px; background: rgba(0,0,0,0.1); border-radius: 8px;">
                     <h3>Add New Trigger</h3>
-                    <form id="addTriggerForm">
+                    <form id="addTriggerForm" style="margin-top: 15px;">
                         <div class="form-group">
-                            <label>Trigger Phrase (Case Insensitive)</label>
-                            <input type="text" name="phrase" class="input-field" placeholder="e.g. download link" required>
+                            <label>Trigger Phrase (Keywords)</label>
+                            <input type="text" name="phrase" class="input-field" placeholder="e.g. how to join" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Response Content</label>
+                            <textarea name="response" rows="3" class="input-field" placeholder="What should the bot say?" required></textarea>
                         </div>
                         <div class="form-group">
                             <label>Response Type</label>
@@ -66,11 +70,7 @@
                                 <option value="embed">Rich Embed</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>Response Content</label>
-                            <textarea name="response" rows="3" class="input-field" placeholder="What the bot should say..." required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Add Trigger</button>
+                        <button type="submit" class="btn btn-primary">Create Trigger</button>
                     </form>
                 </div>
             </div>
@@ -97,9 +97,10 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to create trigger', 'error');
             }
         });
 
@@ -112,10 +113,18 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to remove trigger', 'error');
             }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
     </script>
 </body>

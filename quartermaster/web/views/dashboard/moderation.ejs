@@ -18,13 +18,15 @@
             </div>
 
             <h1>Moderation & Auto-Mod</h1>
+            <p>Maintain server order with automated protections and a searchable warning history.</p>
 
             <div class="settings-grid">
+                <!-- 1. Auto-Moderation Toggles -->
                 <div class="settings-section">
                     <h2>Auto-Moderation</h2>
                     <form id="automod-form">
                         <div class="setting-item">
-                            <label>Spam Protection</label>
+                            <label>General Spam Protection</label>
                             <select name="spam_enabled" class="input-select">
                                 <option value="1" <%= automod.spam_enabled ? 'selected' : '' %>>Enabled</option>
                                 <option value="0" <%= !automod.spam_enabled ? 'selected' : '' %>>Disabled</option>
@@ -88,99 +90,91 @@
                             <label>Mention Threshold (Max pings)</label>
                             <input type="number" name="mention_threshold" value="<%= automod.mention_threshold %>" class="input-field">
                         </div>
-                        <button type="submit" class="btn btn-primary">Save Auto-Mod Settings</button>
+                        <button type="submit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 1rem;">Save Protections</button>
                     </form>
                 </div>
 
+                <!-- 2. Word Blacklist -->
                 <div class="settings-section">
                     <h2>Forbidden Words</h2>
-                    <div class="blacklist-manager">
-                        <div class="add-word">
+                    <p>Messages containing these words will be automatically deleted if Bad Words Filter is enabled.</p>
+                    <div class="add-box" style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                        <div class="form-row">
                             <input type="text" id="new-word" placeholder="Add word to block..." class="input-field">
-                            <button id="add-word-btn" class="btn btn-secondary">Add</button>
+                            <button id="add-word-btn" class="btn btn-secondary">Add Word</button>
                         </div>
-                        <div class="word-list">
-                            <% if (blacklist.length === 0) { %>
-                                <p class="muted">Blacklist is empty.</p>
-                            <% } else { %>
-                                <% blacklist.forEach(item => { %>
-                                    <span class="word-tag">
-                                        <%= item.word %>
-                                        <button class="remove-word" onclick="removeWord('<%= item.word %>')">&times;</button>
-                                    </span>
-                                <% }); %>
-                            <% } %>
-                        </div>
+                    </div>
+                    <div class="word-list" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <% if (blacklist.length === 0) { %>
+                            <p class="muted">Blacklist is empty.</p>
+                        <% } else { %>
+                            <% blacklist.forEach(item => { %>
+                                <span class="word-tag" style="background: var(--bg-tertiary); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                                    <code><%= item.word %></code>
+                                    <button class="remove-word" onclick="removeWord('<%= item.word %>')" style="background: none; border: none; color: var(--danger-color); cursor: pointer; font-size: 1.2rem; line-height: 1;">&times;</button>
+                                </span>
+                            <% }); %>
+                        <% } %>
                     </div>
                 </div>
             </div>
 
+            <!-- 3. Warning History -->
             <div class="settings-section">
                 <h2>Warning History</h2>
-
                 <% if (warnings.length === 0) { %>
-                    <div class="empty-state">
-                        <p>No warnings have been issued yet.</p>
-                    </div>
+                    <p class="muted">No warnings have been issued yet.</p>
                 <% } else { %>
-                    <div class="warnings-table">
-                        <table>
-                            <thead>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Reason</th>
+                                <th>Moderator</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% warnings.forEach(warning => { %>
                                 <tr>
-                                    <th>User</th>
-                                    <th>Reason</th>
-                                    <th>Moderator</th>
-                                    <th>Date</th>
+                                    <td><code><%= warning.user_id %></code></td>
+                                    <td><%= warning.reason || 'No reason provided' %></td>
+                                    <td><code><%= warning.moderator_id %></code></td>
+                                    <td class="muted"><%= new Date(warning.timestamp * 1000).toLocaleString() %></td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                <% warnings.forEach(warning => {
-                                    const member = guild.members.cache.get(warning.user_id);
-                                    const moderator = guild.members.cache.get(warning.moderator_id);
-                                %>
-                                    <tr>
-                                        <td>
-                                            <% if (member) { %>
-                                                <%= member.user.tag %>
-                                            <% } else { %>
-                                                User ID: <%= warning.user_id %>
-                                            <% } %>
-                                        </td>
-                                        <td><%= warning.reason || 'No reason provided' %></td>
-                                        <td>
-                                            <% if (moderator) { %>
-                                                <%= moderator.user.tag %>
-                                            <% } else { %>
-                                                User ID: <%= warning.moderator_id %>
-                                            <% } %>
-                                        </td>
-                                        <td><%= new Date(warning.timestamp * 1000).toLocaleString() %></td>
-                                    </tr>
-                                <% }); %>
-                            </tbody>
-                        </table>
-                    </div>
+                            <% }); %>
+                        </tbody>
+                    </table>
                 <% } %>
             </div>
 
-            <div class="info-box">
-                <h3>Moderation Commands</h3>
-                <p>Use these commands in Discord to moderate your server:</p>
-                <ul>
-                    <li><code>!ban @user [reason]</code> - Ban a member</li>
-                    <li><code>!kick @user [reason]</code> - Kick a member</li>
-                    <li><code>!mute @user &lt;minutes&gt; [reason]</code> - Mute a member</li>
-                    <li><code>!warn @user &lt;reason&gt;</code> - Warn a member</li>
-                    <li><code>!warnings @user</code> - View warnings for a member</li>
-                    <li><code>!clearwarnings @user</code> - Clear all warnings (Admin only)</li>
-                </ul>
+            <!-- 4. Quick Commands -->
+            <div class="settings-section">
+                <h2>Moderation Commands</h2>
+                <div class="info-box">
+                    <p>These commands can be used directly in Discord by staff members:</p>
+                    <table class="table table-small" style="margin-top: 10px;">
+                        <tbody>
+                            <tr><td><code>/ban</code></td><td>Ban a member permanently</td></tr>
+                            <tr><td><code>/kick</code></td><td>Remove a member from the server</td></tr>
+                            <tr><td><code>/mute</code></td><td>Temporary timeout for a member</td></tr>
+                            <tr><td><code>/warn</code></td><td>Issue a formal warning</td></tr>
+                            <tr><td><code>/warnings</code></td><td>View a member's warning history</td></tr>
+                            <tr><td><code>/clearwarnings</code></td><td>Wipe warnings for a member (Admin)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
+    <div id="notification" class="notification"></div>
+
     <%- include('../partials/footer') %>
 
     <script>
+        const guildId = '<%= guild.id %>';
+
         // Handle Auto-mod form
         document.getElementById('automod-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -188,20 +182,16 @@
             const data = Object.fromEntries(formData.entries());
             
             try {
-                const response = await fetch(`/api/server/<%= guild.id %>/automod`, {
+                const response = await fetch(`/api/server/${guildId}/automod`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
-                if (result.success) {
-                    alert('Auto-mod settings saved successfully!');
-                } else {
-                    alert('Error: ' + result.error);
-                }
+                showNotification(result.success ? 'Auto-mod settings saved!' : 'Error: ' + result.error, result.success ? 'success' : 'error');
             } catch (error) {
                 console.error(error);
-                alert('Failed to save settings');
+                showNotification('Failed to save settings', 'error');
             }
         });
 
@@ -212,20 +202,17 @@
             if (!word) return;
 
             try {
-                const response = await fetch(`/api/server/<%= guild.id %>/automod/blacklist`, {
+                const response = await fetch(`/api/server/${guildId}/automod/blacklist`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ word })
                 });
                 const result = await response.json();
-                if (result.success) {
-                    location.reload();
-                } else {
-                    alert('Error: ' + result.error);
-                }
+                if (result.success) location.reload();
+                else showNotification('Error: ' + result.error, 'error');
             } catch (error) {
                 console.error(error);
-                alert('Failed to add word');
+                showNotification('Failed to add word', 'error');
             }
         });
 
@@ -233,19 +220,23 @@
             if (!confirm(`Remove "${word}" from the blacklist?`)) return;
 
             try {
-                const response = await fetch(`/api/server/<%= guild.id %>/automod/blacklist/${encodeURIComponent(word)}`, {
+                const response = await fetch(`/api/server/${guildId}/automod/blacklist/${encodeURIComponent(word)}`, {
                     method: 'DELETE'
                 });
                 const result = await response.json();
-                if (result.success) {
-                    location.reload();
-                } else {
-                    alert('Error: ' + result.error);
-                }
+                if (result.success) location.reload();
+                else showNotification('Error: ' + result.error, 'error');
             } catch (error) {
                 console.error(error);
-                alert('Failed to remove word');
+                showNotification('Failed to remove word', 'error');
             }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
     </script>
 </body>

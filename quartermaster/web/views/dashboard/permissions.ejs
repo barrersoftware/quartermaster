@@ -17,73 +17,83 @@
                 <span>Permissions</span>
             </div>
 
-            <h1>Role-Based Access Control</h1>
-            <p>Manage who can use specific bot command categories.</p>
+            <h1>Role-Based Access Control (RBAC)</h1>
+            <p>Define specific roles that are authorized to perform moderator actions and manage bot settings.</p>
 
             <div class="settings-section">
                 <h2>Moderator Roles</h2>
-                <p>Members with these roles can use commands in the <strong>Moderation</strong> category (Ban, Kick, Mute, Warn).</p>
-                <p><small>Note: Administrators always have Moderator access.</small></p>
+                <p>Members with these roles can use commands in the <strong>Moderation</strong> category (Ban, Kick, Mute, Warn) and manage Auto-Mod.</p>
+                <div class="info-box" style="margin-bottom: 20px;">
+                    <strong>Note:</strong> Server Administrators always have full access to all bot features regardless of these settings.
+                </div>
 
                 <div class="roles-manager">
-                    <div class="active-roles">
+                    <div class="active-roles" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
                         <% if (settings.mod_roles.length === 0) { %>
-                            <p class="muted">No moderator roles designated.</p>
+                            <p class="muted">No moderator roles designated. Only Administrators can moderate.</p>
                         <% } else { %>
                             <% settings.mod_roles.forEach(roleId => { 
                                 const role = roles.find(r => r.id === roleId); %>
-                                <div class="role-tag" style="border-left: 4px solid <%= role ? role.hexColor : '#ccc' %>">
-                                    <%= role ? role.name : 'Unknown Role' %>
-                                    <button onclick="removeRole('<%= roleId %>')" class="remove-role">&times;</button>
+                                <div class="role-tag" style="background: var(--bg-tertiary); padding: 8px 15px; border-radius: 6px; border-left: 4px solid <%= role ? role.hexColor : '#ccc' %>; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                                    <span style="font-weight: 600;">@<%= role ? role.name : 'Unknown Role' %></span>
+                                    <button onclick="removeRole('<%= roleId %>')" class="remove-role" style="background: none; border: none; color: var(--danger-color); cursor: pointer; font-size: 1.2rem;">&times;</button>
                                 </div>
                             <% }); %>
                         <% } %>
                     </div>
 
-                    <div class="add-role-form">
-                        <select id="role-select" class="input-select">
-                            <option value="">Select a role to add...</option>
-                            <% roles.forEach(role => { %>
-                                <% if (!settings.mod_roles.includes(role.id)) { %>
-                                    <option value="<%= role.id %>"><%= role.name %></option>
-                                <% } %>
-                            <% }); %>
-                        </select>
-                        <button onclick="addRole()" class="btn btn-primary">Add Moderator Role</button>
+                    <div class="add-box" style="padding: 20px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                        <h3>Designate New Moderator Role</h3>
+                        <div class="form-row" style="margin-top: 10px;">
+                            <select id="role-select" class="input-select" style="max-width: 300px;">
+                                <option value="">Select a role...</option>
+                                <% roles.forEach(role => { %>
+                                    <% if (!settings.mod_roles.includes(role.id)) { %>
+                                        <option value="<%= role.id %>">@<%= role.name %></option>
+                                    <% } %>
+                                <% }); %>
+                            </select>
+                            <button onclick="addRole()" class="btn btn-primary">Grant Moderator Access</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="settings-section">
-                <h2>Command Categories</h2>
+                <h2>Category Access Map</h2>
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th>Requirement</th>
-                            <th>Description</th>
+                            <th>Command Category</th>
+                            <th>Minimum Permission</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Leveling</td>
-                            <td><span class="badge badge-success">Everyone</span></td>
-                            <td>Rank, Leaderboard, etc.</td>
+                            <td><strong>Leveling & Ranking</strong></td>
+                            <td>Everyone</td>
+                            <td><span class="badge badge-success">Open</span></td>
                         </tr>
                         <tr>
-                            <td>Moderation</td>
-                            <td><span class="badge badge-info">Moderator Roles</span></td>
-                            <td>Kick, Ban, Mute, Warn, Auto-mod management.</td>
+                            <td><strong>Moderation Suite</strong></td>
+                            <td>Moderator Roles / Admin</td>
+                            <td><span class="badge badge-info">Restricted</span></td>
                         </tr>
                         <tr>
-                            <td>Utility / Setup</td>
-                            <td><span class="badge badge-danger">Administrators</span></td>
-                            <td>Server setup, community automation, roles.</td>
+                            <td><strong>Economy & Store</strong></td>
+                            <td>Everyone</td>
+                            <td><span class="badge badge-success">Open</span></td>
                         </tr>
                         <tr>
-                            <td>Raid Protection</td>
-                            <td><span class="badge badge-danger">Administrators</span></td>
-                            <td>Anti-raid settings and lockdown.</td>
+                            <td><strong>System Configuration</strong></td>
+                            <td>Administrators Only</td>
+                            <td><span class="badge badge-danger">Locked</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Raid Protection</strong></td>
+                            <td>Administrators Only</td>
+                            <td><span class="badge badge-danger">Locked</span></td>
                         </tr>
                     </tbody>
                 </table>
@@ -110,9 +120,10 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to add role', 'error');
             }
         }
 
@@ -125,10 +136,18 @@
                 });
                 const result = await response.json();
                 if (result.success) location.reload();
-                else alert(result.error);
+                else showNotification(result.error, 'error');
             } catch (e) {
                 console.error(e);
+                showNotification('Failed to remove role', 'error');
             }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification notification-${type} show`;
+            setTimeout(() => notification.classList.remove('show'), 3000);
         }
     </script>
 </body>

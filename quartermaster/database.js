@@ -95,6 +95,7 @@ function initDatabase() {
             welcome_channel TEXT,
             leave_channel TEXT,
             log_channel TEXT,
+            level_up_channel TEXT, -- NULL means current channel
             mute_role TEXT,
             rank_card_color TEXT DEFAULT '#5865F2',
             auto_role TEXT,
@@ -105,6 +106,9 @@ function initDatabase() {
     `);
 
     // Migration: Add columns if they don't exist
+    try {
+        db.exec("ALTER TABLE guild_settings ADD COLUMN level_up_channel TEXT");
+    } catch (e) { /* Column already exists */ }
     try {
         db.exec("ALTER TABLE guild_settings ADD COLUMN rank_card_color TEXT DEFAULT '#5865F2'");
     } catch (e) { /* Column already exists */ }
@@ -357,7 +361,7 @@ const clearWarnings = db.prepare('DELETE FROM warnings WHERE user_id = ? AND gui
 
 // Guild settings functions
 const getGuildSettings = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?');
-const setGuildSetting = db.prepare('INSERT OR REPLACE INTO guild_settings (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+const setGuildSetting = db.prepare('INSERT OR REPLACE INTO guild_settings (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background, level_up_channel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
 // Raid protection functions
 const getRaidSettings = db.prepare('SELECT * FROM raid_settings WHERE guild_id = ?');
@@ -452,6 +456,7 @@ function getGuildSettingsOrDefault(guildId) {
             welcome_channel: null,
             leave_channel: null,
             log_channel: null,
+            level_up_channel: null,
             mute_role: null,
             rank_card_color: '#5865F2',
             auto_role: null,

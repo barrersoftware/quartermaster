@@ -10,6 +10,23 @@ function hasGuildAccess(req, guildId) {
     return !!userGuild;
 }
 
+// Helper to save guild settings
+function saveGuildSettings(guildId, settings) {
+    db.setGuildSetting.run(
+        guildId,
+        settings.welcome_channel,
+        settings.leave_channel,
+        settings.log_channel,
+        settings.mute_role,
+        settings.rank_card_color,
+        settings.auto_role,
+        JSON.stringify(settings.mod_roles),
+        settings.rank_background,
+        settings.welcome_background,
+        settings.level_up_channel
+    );
+}
+
 // Update leveling settings
 router.post('/server/:guildId/leveling', (req, res) => {
     const guildId = req.params.guildId;
@@ -36,11 +53,6 @@ router.post('/server/:guildId/leveling', (req, res) => {
     }
     if (req.body.levelUpMessage) {
         config.leveling.levelUpMessage = req.body.levelUpMessage;
-    }
-
-    // Update role rewards
-    if (req.body.roleRewards) {
-        config.leveling.roleRewards = JSON.parse(req.body.roleRewards);
     }
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -178,21 +190,13 @@ router.post('/server/:guildId/welcome', (req, res) => {
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    // Update auto_role and visuals in database
+    // Update auto_role in database
     const settings = db.getGuildSettingsOrDefault(guildId);
     if (req.body.auto_role !== undefined) {
         settings.auto_role = req.body.auto_role || null;
     }
 
-    db.setGuildSetting.run(
-        guildId,
-        settings.welcome_channel,
-        settings.leave_channel,
-        settings.log_channel,
-        settings.mute_role,
-        settings.rank_card_color,
-        settings.auto_role
-    );
+    saveGuildSettings(guildId, settings);
 
     res.json({ success: true, message: 'Welcome/Leave settings updated' });
 });
@@ -312,6 +316,29 @@ router.delete('/server/:guildId/automod/blacklist/:word', (req, res) => {
     }
 });
 
+// Update announcement settings
+router.post('/server/:guildId/settings/announcements', (req, res) => {
+    const guildId = req.params.guildId;
+
+    if (!hasGuildAccess(req, guildId)) {
+        return res.status(403).json({ error: 'No permission' });
+    }
+
+    try {
+        const settings = db.getGuildSettingsOrDefault(guildId);
+        
+        if (req.body.level_up_channel !== undefined) {
+            settings.level_up_channel = req.body.level_up_channel || null;
+        }
+
+        saveGuildSettings(guildId, settings);
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update announcements' });
+    }
+});
+
 // Update visual settings
 router.post('/server/:guildId/settings/visuals', (req, res) => {
     const guildId = req.params.guildId;
@@ -327,18 +354,7 @@ router.post('/server/:guildId/settings/visuals', (req, res) => {
         if (req.body.rank_background !== undefined) settings.rank_background = req.body.rank_background || null;
         if (req.body.welcome_background !== undefined) settings.welcome_background = req.body.welcome_background || null;
 
-        db.setGuildSetting.run(
-            guildId,
-            settings.welcome_channel,
-            settings.leave_channel,
-            settings.log_channel,
-            settings.mute_role,
-            settings.rank_card_color,
-            settings.auto_role,
-            JSON.stringify(settings.mod_roles),
-            settings.rank_background,
-            settings.welcome_background
-        );
+        saveGuildSettings(guildId, settings);
 
         res.json({ success: true });
     } catch (error) {
@@ -399,16 +415,7 @@ router.post('/server/:guildId/permissions/mod-roles', (req, res) => {
         const settings = db.getGuildSettingsOrDefault(guildId);
         if (!settings.mod_roles.includes(roleId)) {
             settings.mod_roles.push(roleId);
-            db.setGuildSetting.run(
-                guildId,
-                settings.welcome_channel,
-                settings.leave_channel,
-                settings.log_channel,
-                settings.mute_role,
-                settings.rank_card_color,
-                settings.auto_role,
-                JSON.stringify(settings.mod_roles)
-            );
+            saveGuildSettings(guildId, settings);
         }
         res.json({ success: true });
     } catch (error) {
@@ -430,18 +437,7 @@ router.delete('/server/:guildId/permissions/mod-roles/:roleId', (req, res) => {
     try {
         const settings = db.getGuildSettingsOrDefault(guildId);
         settings.mod_roles = settings.mod_roles.filter(id => id !== roleId);
-        db.setGuildSetting.run(
-            guildId,
-            settings.welcome_channel,
-            settings.leave_channel,
-            settings.log_channel,
-            settings.mute_role,
-            settings.rank_card_color,
-            settings.auto_role,
-            JSON.stringify(settings.mod_roles),
-            settings.rank_background,
-            settings.welcome_background
-        );
+        saveGuildSettings(guildId, settings);
         res.json({ success: true });
     } catch (error) {
         console.error(error);

@@ -52,7 +52,13 @@ module.exports = {
 
                     if (result.leveledUp) {
                         const levelUpMsg = config.leveling.levelUpMessage.replace('{user}', `<@${userId}>`).replace('{level}', result.newLevel);
-                        await message.channel.send(levelUpMsg);
+                        
+                        const settings = db.getGuildSettingsOrDefault(guildId);
+                        const targetChannel = settings.level_up_channel 
+                            ? (message.guild.channels.cache.get(settings.level_up_channel) || message.channel)
+                            : message.channel;
+
+                        await targetChannel.send(levelUpMsg);
 
                         const roleReward = db.getRoleRewardForLevel.get(guildId, result.newLevel);
                         if (roleReward) {

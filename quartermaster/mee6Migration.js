@@ -43,12 +43,17 @@ class Mee6MigrationService {
                     break;
                 }
 
-                // Batch database transaction for performance
-                const transaction = db.prepare('INSERT OR REPLACE INTO users (user_id, guild_id, xp, level, last_message) VALUES (?, ?, ?, ?, ?)');
+                // Use ON CONFLICT to update XP/Level without wiping out gold or daily status
+                const transaction = db.prepare(`
+                    INSERT INTO users (user_id, guild_id, xp, level, last_message) 
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, guild_id) DO UPDATE SET 
+                        xp = MAX(users.xp, EXCLUDED.xp),
+                        level = MAX(users.level, EXCLUDED.level)
+                `);
                 
                 const insertMany = db.transaction((users) => {
                     for (const user of users) {
-                        // detailed_xp[2] is lifetime total XP
                         const xp = user.detailed_xp[2];
                         const level = user.level;
                         transaction.run(user.id, guildId, xp, level, 0);
@@ -68,7 +73,16 @@ class Mee6MigrationService {
 
             } catch (error) {
                 console.error(`[MIGRATION] Error at page ${currentPage}:`, error.message);
-                if (interaction) await interaction.followUp({ content: `⚠️ Error during migration at page ${currentPage}. Process stopped.`, ephemeral: true });
+                
+                if (interaction) {
+                    if (error.response && error.response.status === 403) {
+                        await interaction.editReply(`❌ **Migration Failed: Private Leaderboard**\nYour friend's MEE6 leaderboard is set to **Private**. They must set it to **Public** in the MEE6 dashboard for Quartermaster to access the data.`);
+                    } else if (error.response && error.response.status === 404) {
+                        await interaction.editReply(`❌ **Migration Failed: Not Found**\nMEE6 could not find this server. Ensure the Guild ID is correct.`);
+                    } else {
+                        await interaction.editReply(`⚠️ **Error during migration at page ${currentPage}:** ${error.message}`);
+                    }
+                }
                 isProcessing = false;
             }
         }

@@ -118,8 +118,12 @@ class QuartermasterManager {
                                 .replace('{user}', `<@${userId}>`)
                                 .replace('{level}', result.newLevel);
                             
-                            const channel = guild.systemChannel || guild.channels.cache.find(c => c.type === 0);
-                            if (channel) await channel.send(`🎙️ **Voice Active:** ${levelUpMsg}`);
+                            const settings = db.getGuildSettingsOrDefault(guildId);
+                            const targetChannel = settings.level_up_channel 
+                                ? (guild.channels.cache.get(settings.level_up_channel) || guild.systemChannel || guild.channels.cache.find(c => c.type === 0))
+                                : (guild.systemChannel || guild.channels.cache.find(c => c.type === 0));
+
+                            if (targetChannel) await targetChannel.send(`🎙️ **Voice Active:** ${levelUpMsg}`);
                         }
                     }
                 }

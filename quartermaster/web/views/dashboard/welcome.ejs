@@ -18,10 +18,12 @@
             </div>
 
             <h1>Welcome & Leave Messages</h1>
+            <p>Configure automated messages and roles for new and departing members.</p>
 
             <form id="welcomeForm">
+                <!-- 1. Welcome Settings -->
                 <div class="settings-section">
-                    <h2>Welcome Messages</h2>
+                    <h2>Welcome Configuration</h2>
 
                     <div class="form-group">
                         <label class="toggle-label">
@@ -33,7 +35,7 @@
 
                     <div class="form-group">
                         <label>Auto-Role (Join Role)</label>
-                        <select name="auto_role">
+                        <select name="auto_role" class="input-select">
                             <option value="">None (Disabled)</option>
                             <% roles.forEach(role => { %>
                                 <option value="<%= role.id %>" <%= settings.auto_role === role.id ? 'selected' : '' %>>
@@ -46,7 +48,7 @@
 
                     <div class="form-group">
                         <label>Welcome Channel</label>
-                        <select name="welcomeChannel">
+                        <select name="welcomeChannel" class="input-select">
                             <% channels.forEach(channel => { %>
                                 <option value="<%= channel.name %>" <%= config.welcome.channelName === channel.name ? 'selected' : '' %>>
                                     #<%= channel.name %>
@@ -57,13 +59,16 @@
 
                     <div class="form-group">
                         <label>Welcome Message</label>
-                        <textarea name="welcomeMessage" rows="3"><%= config.welcome.message %></textarea>
+                        <textarea name="welcomeMessage" rows="3" class="input-field"><%= config.welcome.message %></textarea>
                         <small>Available placeholders: {user}, {server}, {memberCount}</small>
                     </div>
 
                     <div class="form-group">
                         <label>Embed Color</label>
-                        <input type="color" name="welcomeColor" value="<%= config.welcome.embedColor %>">
+                        <div class="color-picker-group">
+                            <input type="color" name="welcomeColor" value="<%= config.welcome.embedColor %>" class="color-input">
+                            <input type="text" id="colorText" value="<%= config.welcome.embedColor %>" class="input-field" style="width: 100px;">
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -73,8 +78,9 @@
                     </div>
                 </div>
 
+                <!-- 2. Leave Settings -->
                 <div class="settings-section">
-                    <h2>Leave Messages</h2>
+                    <h2>Leave Configuration</h2>
 
                     <div class="form-group">
                         <label class="toggle-label">
@@ -86,7 +92,7 @@
 
                     <div class="form-group">
                         <label>Leave Channel</label>
-                        <select name="leaveChannel">
+                        <select name="leaveChannel" class="input-select">
                             <% channels.forEach(channel => { %>
                                 <option value="<%= channel.name %>" <%= config.leave.channelName === channel.name ? 'selected' : '' %>>
                                     #<%= channel.name %>
@@ -97,12 +103,14 @@
 
                     <div class="form-group">
                         <label>Leave Message</label>
-                        <textarea name="leaveMessage" rows="3"><%= config.leave.message %></textarea>
+                        <textarea name="leaveMessage" rows="3" class="input-field"><%= config.leave.message %></textarea>
                         <small>Available placeholders: {user}, {server}, {memberCount}</small>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Save Settings</button>
+                <div style="margin-top: 2rem;">
+                    <button type="submit" class="btn btn-primary btn-large">Save All Welcome & Leave Settings</button>
+                </div>
             </form>
         </div>
     </div>
@@ -113,6 +121,14 @@
 
     <script>
         const guildId = '<%= guild.id %>';
+
+        // Sync color input with text
+        const colorInput = document.querySelector('input[name="welcomeColor"]');
+        const colorText = document.getElementById('colorText');
+        if (colorInput && colorText) {
+            colorInput.addEventListener('input', () => colorText.value = colorInput.value.toUpperCase());
+            colorText.addEventListener('input', () => colorInput.value = colorText.value);
+        }
 
         document.getElementById('welcomeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -135,7 +151,7 @@
             });
 
             const data = await response.json();
-            showNotification(data.message, response.ok ? 'success' : 'error');
+            showNotification(data.message || 'Settings saved!', response.ok ? 'success' : 'error');
         });
 
         function showNotification(message, type) {
