@@ -59,9 +59,35 @@ fi
 
 # 2. Build and Publish
 echo "Restoring and publishing Quartermaster..."
-dotnet publish --configuration Release --output ./publish
+dotnet publish Quartermaster.Bot/Quartermaster.Bot.csproj --configuration Release --output ./publish
+dotnet publish Quartermaster.Web/Quartermaster.Web.csproj --configuration Release --output ./publish
 
-# 3. Optional: Install as systemd service (Linux only)
+# 3. Configuration Phase
+echo ""
+echo "--- Configuration Phase ---"
+echo "You will need your Discord Application credentials."
+echo "Get them here: https://discord.com/developers/applications"
+echo ""
+
+read -p "Enter your Discord Bot Token: " bot_token
+read -p "Enter your Client ID (Application ID): " client_id
+read -p "Enter your Client Secret: " client_secret
+
+# Use python3 to update JSON safely without jq dependency
+python3 -c "
+import json, sys
+with open('appsettings.json', 'r') as f:
+    config = json.load(f)
+if '$bot_token': config['Bot']['Token'] = '$bot_token'
+if '$client_id': config['Discord']['ClientId'] = '$client_id'
+if '$client_secret': config['Discord']['ClientSecret'] = '$client_secret'
+with open('appsettings.json', 'w') as f:
+    json.dump(config, f, indent=2)
+"
+
+echo "✅ Configuration saved to appsettings.json"
+
+# 4. Optional: Install as systemd service (Linux only)
 if [[ "$OS" == "Linux" ]]; then
     read -p "Would you like to install Quartermaster as a systemd service? (Y/N): " install_service
     if [[ "$install_service" == "Y" || "$install_service" == "y" ]]; then

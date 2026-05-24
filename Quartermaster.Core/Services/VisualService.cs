@@ -27,7 +27,7 @@ public class VisualService
         }
     }
 
-    private async Task<SKBitmap> LoadBitmapAsync(string? url)
+    private async Task<SKBitmap?> LoadBitmapAsync(string? url)
     {
         if (string.IsNullOrEmpty(url)) return null;
 
@@ -43,7 +43,7 @@ public class VisualService
         }
     }
 
-    private void DrawCircularAvatar(SKCanvas canvas, SKBitmap avatar, float x, float y, float size)
+    private void DrawCircularAvatar(SKCanvas canvas, SKBitmap? avatar, float x, float y, float size)
     {
         if (avatar == null) return;
 
@@ -71,19 +71,23 @@ public class VisualService
         var canvas = surface.Canvas;
 
         // Background
-        var bgBitmap = await LoadBitmapAsync(backgroundUrl);
-        if (bgBitmap != null)
+        using (var bgBitmap = await LoadBitmapAsync(backgroundUrl))
         {
-            canvas.DrawBitmap(bgBitmap, new SKRect(0, 0, width, height));
-        }
-        else
-        {
-            canvas.Clear(SKColor.Parse("#23272A"));
+            if (bgBitmap != null)
+            {
+                canvas.DrawBitmap(bgBitmap, new SKRect(0, 0, width, height));
+            }
+            else
+            {
+                canvas.Clear(SKColor.Parse("#23272A"));
+            }
         }
 
         // Avatar
-        var avatarBitmap = await LoadBitmapAsync(avatarUrl);
-        DrawCircularAvatar(canvas, avatarBitmap, 40, 35, 180);
+        using (var avatarBitmap = await LoadBitmapAsync(avatarUrl))
+        {
+            DrawCircularAvatar(canvas, avatarBitmap, 40, 35, 180);
+        }
 
         // Progress Bar
         float progress = Math.Clamp((float)currentXp / requiredXp, 0, 1);
@@ -101,14 +105,14 @@ public class VisualService
         }
 
         // Text
-        using (var paint = new SKPaint { Typeface = _typeface, Color = SKColors.White, IsAntialias = true })
+        using (var font = new SKFont(_typeface, 32))
+        using (var paint = new SKPaint { Color = SKColors.White, IsAntialias = true })
         {
-            paint.TextSize = 32;
-            canvas.DrawText(username, 260, 85, paint);
+            canvas.DrawText(username, 260, 85, font, paint);
 
-            paint.TextSize = 18;
-            canvas.DrawText($"RANK #{rank}  |  LEVEL {level}", 260, 130, paint);
-            canvas.DrawText($"{currentXp:N0} / {requiredXp:N0} XP", 700, 130, paint);
+            font.Size = 18;
+            canvas.DrawText($"RANK #{rank}  |  LEVEL {level}", 260, 130, font, paint);
+            canvas.DrawText($"{currentXp:N0} / {requiredXp:N0} XP", 700, 130, font, paint);
         }
 
         using var image = surface.Snapshot();
@@ -124,26 +128,33 @@ public class VisualService
         using var surface = SKSurface.Create(new SKImageInfo(width, height));
         var canvas = surface.Canvas;
 
-        var bgBitmap = await LoadBitmapAsync(backgroundUrl);
-        if (bgBitmap != null)
+        using (var bgBitmap = await LoadBitmapAsync(backgroundUrl))
         {
-            canvas.DrawBitmap(bgBitmap, new SKRect(0, 0, width, height));
+            if (bgBitmap != null)
+            {
+                canvas.DrawBitmap(bgBitmap, new SKRect(0, 0, width, height));
+            }
+            else
+            {
+                canvas.Clear(SKColor.Parse("#23272A"));
+            }
         }
-        else
+
+        using (var avatarBitmap = await LoadBitmapAsync(avatarUrl))
         {
-            canvas.Clear(SKColor.Parse("#23272A"));
+            DrawCircularAvatar(canvas, avatarBitmap, (width - 250) / 2, 50, 250);
         }
 
-        var avatarBitmap = await LoadBitmapAsync(avatarUrl);
-        DrawCircularAvatar(canvas, avatarBitmap, (width - 250) / 2, 50, 250);
-
-        using (var paint = new SKPaint { Typeface = _typeface, Color = SKColors.White, IsAntialias = true, TextAlign = SKTextAlign.Center })
+        using (var font = new SKFont(_typeface, 64))
+        using (var paint = new SKPaint { Color = SKColors.White, IsAntialias = true })
         {
-            paint.TextSize = 64;
-            canvas.DrawText("WELCOME", width / 2, 360, paint);
+            float welcomeX = (width - font.MeasureText("WELCOME")) / 2;
+            canvas.DrawText("WELCOME", welcomeX, 360, font, paint);
 
-            paint.TextSize = 32;
-            canvas.DrawText($"{username}  |  Member #{memberCount}", width / 2, 410, paint);
+            font.Size = 32;
+            string subText = $"{username}  |  Member #{memberCount}";
+            float subX = (width - font.MeasureText(subText)) / 2;
+            canvas.DrawText(subText, subX, 410, font, paint);
         }
 
         using var image = surface.Snapshot();
