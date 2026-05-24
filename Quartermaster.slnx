@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Quartermaster.Bot/Quartermaster.Bot.csproj" />
+  <Project Path="Quartermaster.Core/Quartermaster.Core.csproj" />
+  <Project Path="Quartermaster.Web/Quartermaster.Web.csproj" />
+</Solution>

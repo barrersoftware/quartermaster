@@ -1,0 +1,93 @@
+@model Quartermaster.Core.Models.GuildSetting
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    ViewData["Title"] = "Leveling - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Leveling</span>
+        </div>
+
+        <h1>Leveling Settings</h1>
+
+        <!-- 1. General Settings -->
+        <div class="settings-section">
+            <h2>General Settings</h2>
+            <form id="levelingForm">
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="enabled" checked> <!-- We'll need to load config.json here too or move to DB -->
+                        <span class="toggle-slider"></span>
+                        Enable Leveling System
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>Level Up Message</label>
+                    <input type="text" name="levelUpMessage" value="Congratulations {user}, you just advanced to level {level}!" class="input-field">
+                    <small>Use {user} for mention, {level} for level number</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </form>
+        </div>
+
+        <!-- 2. Level Up Announcements -->
+        <div class="settings-section">
+            <h2>Level Up Announcements</h2>
+            <form id="announcementForm">
+                <div class="form-group">
+                    <label>Announcement Channel</label>
+                    <select name="level_up_channel" class="input-select">
+                        <option value="">In the channel where it happened (Current Channel)</option>
+                        <!-- Channels should be passed in via ViewComponent or ViewBag -->
+                    </select>
+                    <small>Choose where the bot should post level-up messages.</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Announcement Settings</button>
+            </form>
+        </div>
+
+        <!-- 3. Visual Customization -->
+        <div class="settings-section">
+            <h2>Visual Customization</h2>
+            <form id="visualForm">
+                <div class="form-group">
+                    <label>Progress Bar Color</label>
+                    <div class="color-picker-group" style="display:flex; gap:10px;">
+                        <input type="color" name="rank_card_color" value="@Model.RankCardColor" class="color-input">
+                        <input type="text" id="colorText" value="@Model.RankCardColor" class="input-field" style="width: 100px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Custom Rank Card Background (URL)</label>
+                    <input type="text" name="rank_background" value="@Model.RankBackground" class="input-field" placeholder="https://example.com/image.png">
+                </div>
+                <button type="submit" class="btn btn-primary">Update Visuals</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+        
+        // Form submission logic (similar to JS version but hitting C# API)
+        document.getElementById('visualForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/settings/visuals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            const data = await response.json();
+            alert(data.success ? 'Visuals updated!' : 'Update failed');
+        });
+    </script>
+}

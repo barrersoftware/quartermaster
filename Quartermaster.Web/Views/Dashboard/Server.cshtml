@@ -1,0 +1,60 @@
+@model Quartermaster.Core.Models.GuildSetting
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    ViewData["Title"] = guild?.Name ?? "Server Settings";
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <span>@guild?.Name</span>
+        </div>
+
+        <div class="server-header" style="display: flex; align-items: center; gap: 20px; margin-bottom: 2rem;">
+            @if (!string.IsNullOrEmpty(guild?.Icon))
+            {
+                <img src="https://cdn.discordapp.com/icons/@guild.Id/@guild.Icon" style="width: 64px; height: 64px; border-radius: 50%;" />
+            }
+            <h1>@guild?.Name</h1>
+        </div>
+
+        <div class="module-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+            <a href="/dashboard/server/@guild?.Id/leveling" class="module-card">
+                <div class="module-icon">📈</div>
+                <h3>Leveling & XP</h3>
+                <p>Configure levels, roles, and rank cards.</p>
+            </a>
+
+            <a href="/dashboard/server/@guild?.Id/moderation" class="module-card">
+                <div class="module-icon">🛡️</div>
+                <h3>Auto-Moderation</h3>
+                <p>Spam protection, filters, and word blacklist.</p>
+            </a>
+
+            <a href="/dashboard/server/@guild?.Id/economy" class="module-card">
+                <div class="module-icon">💰</div>
+                <h3>Economy & Shop</h3>
+                <p>Manage gold and server currency store.</p>
+            </a>
+
+            <a href="/dashboard/server/@guild?.Id/permissions" class="module-card">
+                <div class="module-icon">🔑</div>
+                <h3>Permissions</h3>
+                <p>Set moderator roles and bot access.</p>
+            </a>
+            
+            <a href="/dashboard/server/@guild?.Id/welcome" class="module-card">
+                <div class="module-icon">👋</div>
+                <h3>Welcome & Leave</h3>
+                <p>Custom welcome images and join roles.</p>
+            </a>
+
+            <a href="/dashboard/server/@guild?.Id/logs" class="module-card">
+                <div class="module-icon">📑</div>
+                <h3>Audit Logs</h3>
+                <p>View permanent history of server events.</p>
+            </a>
+        </div>
+    </div>
+</div>

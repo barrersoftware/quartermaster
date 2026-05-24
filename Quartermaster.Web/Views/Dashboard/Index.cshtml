@@ -1,0 +1,33 @@
+@model List<Quartermaster.Web.Services.DiscordGuild>
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <h1>Server Selection</h1>
+        <p class="muted">Select a server to configure Quartermaster.</p>
+
+        <div class="server-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 2rem;">
+            @foreach (var guild in Model)
+            {
+                <a href="/dashboard/server/@guild.Id" class="server-card" style="text-decoration: none; color: inherit; background: var(--bg-secondary); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid var(--border-color); transition: transform 0.2s;">
+                    <div class="server-icon" style="margin-bottom: 15px;">
+                        @if (!string.IsNullOrEmpty(guild.Icon))
+                        {
+                            <img src="https://cdn.discordapp.com/icons/@guild.Id/@guild.Icon" style="width: 80px; height: 80px; border-radius: 50%;" />
+                        }
+                        else
+                        {
+                            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto;">
+                                @guild.Name[0]
+                            </div>
+                        }
+                    </div>
+                    <h3>@guild.Name</h3>
+                    <span class="badge badge-info">Manage</span>
+                </a>
+            }
+        </div>
+    </div>
+</div>

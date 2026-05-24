@@ -1,0 +1,44 @@
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="hero">
+    <div class="container">
+        <img src="~/img/logo.png" alt="Quartermaster Logo" class="hero-logo">
+        <h1>Quartermaster .NET</h1>
+        <p>Next-generation server management. Re-engineered in C# for maximum performance.</p>
+        
+        <div class="hero-actions" style="margin-top: 2rem;">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a asp-controller="Dashboard" asp-action="Index" class="btn btn-primary btn-large">Go to Dashboard</a>
+            }
+            else
+            {
+                <a href="/login" class="btn btn-primary btn-large">Login with Discord</a>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="features-section">
+    <div class="container">
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>High Performance</h3>
+                <p>Built on the .NET 10 core for lightning-fast response times and multi-threaded efficiency.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3>Enterprise Security</h3>
+                <p>Advanced Auto-Moderation and Role-Based Access Control to keep your server safe.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>MEE6 Migration</h3>
+                <p>Import all your leveling data from MEE6 with a single click. Zero progress lost.</p>
+            </div>
+        </div>
+    </div>
+</div>
