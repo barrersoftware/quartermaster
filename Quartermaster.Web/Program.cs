@@ -37,6 +37,13 @@ builder.Services.AddAuthentication(options =>
 {
     options.ClientId = builder.Configuration["Discord:ClientId"] ?? "";
     options.ClientSecret = builder.Configuration["Discord:ClientSecret"] ?? "";
+    
+    var callbackUrl = builder.Configuration["Discord:CallbackUrl"];
+    if (!string.IsNullOrEmpty(callbackUrl))
+    {
+        options.CallbackPath = new PathString("/callback");
+    }
+
     options.SaveTokens = true;
     options.Scope.Add("guilds");
     options.Scope.Add("identify");
@@ -55,6 +62,10 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Set the port from configuration
+var port = builder.Configuration.GetValue<int?>("Discord:Port") ?? 3000;
+app.Urls.Add($"http://*:{port}");
 
 app.MapControllerRoute(
     name: "default",

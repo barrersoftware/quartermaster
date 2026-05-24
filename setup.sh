@@ -72,6 +72,9 @@ echo ""
 read -p "Enter your Discord Bot Token: " bot_token
 read -p "Enter your Client ID (Application ID): " client_id
 read -p "Enter your Client Secret: " client_secret
+read -p "Enter your Dashboard URL (Default: http://localhost:3000): " dashboard_url
+read -p "Enter your Dashboard Port (Default: 3000): " port
+read -p "Enter your Database Path (Default: ./bot.db): " db_path
 
 # Use python3 to update JSON safely without jq dependency
 python3 -c "
@@ -81,6 +84,24 @@ with open('appsettings.json', 'r') as f:
 if '$bot_token': config['Bot']['Token'] = '$bot_token'
 if '$client_id': config['Discord']['ClientId'] = '$client_id'
 if '$client_secret': config['Discord']['ClientSecret'] = '$client_secret'
+if '$dashboard_url': 
+    config['Discord']['DashboardUrl'] = '$dashboard_url'
+else:
+    config['Discord']['DashboardUrl'] = 'http://localhost:3000'
+
+if '$port':
+    config['Discord']['Port'] = int('$port')
+else:
+    config['Discord']['Port'] = 3000
+
+if '$db_path':
+    config['Bot']['DatabasePath'] = '$db_path'
+else:
+    config['Bot']['DatabasePath'] = './bot.db'
+
+# Auto-set CallbackUrl
+config['Discord']['CallbackUrl'] = config['Discord']['DashboardUrl'].rstrip('/') + '/callback'
+
 with open('appsettings.json', 'w') as f:
     json.dump(config, f, indent=2)
 "

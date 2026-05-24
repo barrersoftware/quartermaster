@@ -69,8 +69,16 @@ public class DiscordBotService : BackgroundService
         // Wire up UserJoined for Welcome Messages and Auto-Role
         _client.UserJoined += HandleUserJoinedAsync;
 
-        await _client.LoginAsync(TokenType.Bot, _config.Token);
-        await _client.StartAsync();
+        try
+        {
+            await _client.LoginAsync(TokenType.Bot, _config.Token);
+            await _client.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, "Failed to start the Discord bot. Please check your token in appsettings.json.");
+            return;
+        }
 
         try
         {

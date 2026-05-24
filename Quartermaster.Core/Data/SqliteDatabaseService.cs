@@ -61,6 +61,12 @@ public class SqliteDatabaseService : IDatabaseService
 
     public SqliteDatabaseService(string databasePath)
     {
+        // Resolve relative paths to absolute paths
+        if (!Path.IsPathRooted(databasePath))
+        {
+            databasePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, databasePath));
+        }
+
         _connectionString = $"Data Source={databasePath}";
         
         // Ensure Snake Case to Pascal Case mapping for Dapper

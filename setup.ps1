@@ -81,10 +81,19 @@ $config = Get-Content $configPath | ConvertFrom-Json
 $botToken = Read-Host "Enter your Discord Bot Token"
 $clientId = Read-Host "Enter your Client ID (Application ID)"
 $clientSecret = Read-Host "Enter your Client Secret"
+$dashboardUrl = Read-Host "Enter your Dashboard URL (Default: http://localhost:3000)"
+$port = Read-Host "Enter your Dashboard Port (Default: 3000)"
+$dbPath = Read-Host "Enter your Database Path (Default: ./bot.db)"
 
 if ($botToken) { $config.Bot.Token = $botToken }
 if ($clientId) { $config.Discord.ClientId = $clientId }
 if ($clientSecret) { $config.Discord.ClientSecret = $clientSecret }
+if ($dashboardUrl) { $config.Discord.DashboardUrl = $dashboardUrl } else { $config.Discord.DashboardUrl = "http://localhost:3000" }
+if ($port) { $config.Discord.Port = [int]$port } else { $config.Discord.Port = 3000 }
+if ($dbPath) { $config.Bot.DatabasePath = $dbPath } else { $config.Bot.DatabasePath = "./bot.db" }
+
+# Ensure CallbackUrl is set based on DashboardUrl
+$config.Discord.CallbackUrl = "$($config.Discord.DashboardUrl.TrimEnd('/'))/callback"
 
 # Save updated config
 $config | ConvertTo-Json -Depth 10 | Set-Content $configPath
