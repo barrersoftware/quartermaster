@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AspNet.Security.OAuth.Discord;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Quartermaster.Core.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,7 @@ builder.Host.UseWindowsService(options => options.ServiceName = "QuartermasterWe
 builder.Host.UseSystemd();
 
 // Robust configuration loading
+// ... (previous logic preserved)
 string configName = "appsettings.json";
 string configPath = "";
 
@@ -20,7 +22,6 @@ else if (File.Exists(Path.Combine("..", configName))) configPath = Path.GetFullP
 
 if (string.IsNullOrEmpty(configPath))
 {
-    // Web needs to stay alive if possible, or fail gracefully
     throw new FileNotFoundException("appsettings.json not found in current, base, or parent directory!");
 }
 
@@ -37,6 +38,21 @@ var dbService = new SqliteDatabaseService(dbPath);
 await dbService.InitializeDatabaseAsync();
 builder.Services.AddSingleton<IDatabaseService>(dbService);
 
+// 1. Forwarded Headers (Essential for Reverse Proxies like Nginx/Caddy)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// 2. Cookie Policy (Fixes 'Correlation failed')
+builder.Services.Configure<CookiePolicyOptions>(options =>
+{
+    options.CheckConsentNeeded = context => false;
+    options.MinimumSameSitePolicy = SameSiteMode.Lax;
+});
+
 // Authentication
 builder.Services.AddAuthentication(options =>
 {
@@ -47,17 +63,17 @@ builder.Services.AddAuthentication(options =>
 {
     options.LoginPath = "/login";
     options.LogoutPath = "/logout";
+    options.Cookie.SameSite = SameSiteMode.Lax;
 })
 .AddDiscord(options =>
 {
     options.ClientId = builder.Configuration["Discord:ClientId"] ?? "";
     options.ClientSecret = builder.Configuration["Discord:ClientSecret"] ?? "";
     
-    var callbackUrl = builder.Configuration["Discord:CallbackUrl"];
-    if (!string.IsNullOrEmpty(callbackUrl))
-    {
-        options.CallbackPath = new PathString("/callback");
-    }
+    // Explicitly set correlation cookie settings
+    options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+    options.CorrelationCookie.HttpOnly = true;
+    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
     options.SaveTokens = true;
     options.Scope.Add("guilds");
@@ -66,6 +82,9 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
+// Use Forwarded Headers first
+app.UseForwardedHeaders();
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -73,6 +92,7 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStaticFiles();
 
+app.UseCookiePolicy(); // Fix correlation cookie
 app.UseRouting();
 
 app.UseAuthentication();
