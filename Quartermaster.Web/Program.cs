@@ -6,6 +6,9 @@ using Quartermaster.Core.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load global configuration from solution root
+builder.Configuration.AddJsonFile("../appsettings.json", optional: false, reloadOnChange: true);
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();

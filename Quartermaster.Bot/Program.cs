@@ -9,6 +9,9 @@ using Quartermaster.Core.Data;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// Load global configuration from solution root
+builder.Configuration.AddJsonFile("../appsettings.json", optional: false, reloadOnChange: true);
+
 // Configuration
 builder.Services.Configure<BotConfiguration>(builder.Configuration.GetSection("Bot"));
 

@@ -14,5 +14,6 @@
 *.db-wal
 
 # Secrets
+/appsettings.json
 appsettings.json
 .env
