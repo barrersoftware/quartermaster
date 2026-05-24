@@ -2,7 +2,13 @@ Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "  Quartermaster .NET - Startup" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
-# Ensure build is up to date
+# Warning for Service users
+if (Get-Service -Name "QuartermasterBot" -ErrorAction SilentlyContinue) {
+    Write-Host "⚠️ WARNING: Windows Services (QuartermasterBot/Web) detected." -ForegroundColor Yellow
+    Write-Host "If the services are already running, this manual start will fail due to file locks or port conflicts." -ForegroundColor Yellow
+    $ans = Read-Host "Continue manual startup? (Y/N)"
+    if ($ans -ne "Y") { exit }
+}
 Write-Host "Checking build..."
 dotnet build --configuration Release
 

@@ -9,6 +9,10 @@ using Quartermaster.Core.Data;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// Add service support
+builder.Services.AddWindowsService(options => options.ServiceName = "QuartermasterBot");
+builder.Services.AddSystemd();
+
 // Load global configuration from solution root
 builder.Configuration.AddJsonFile("../appsettings.json", optional: false, reloadOnChange: true);
 

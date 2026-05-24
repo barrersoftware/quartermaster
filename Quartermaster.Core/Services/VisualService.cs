@@ -2,77 +2,64 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
-using SixLabors.Fonts;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Drawing;
-using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace Quartermaster.Core.Services;
 
 public class VisualService
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly FontCollection _fontCollection;
-    private readonly FontFamily _fontFamily;
+    private readonly SKTypeface _typeface;
 
     public VisualService(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
-        _fontCollection = new FontCollection();
         
-        // Try to load a system font on Windows
+        // Try to load a system font
         string fontPath = @"C:\Windows\Fonts\arial.ttf";
         if (File.Exists(fontPath))
         {
-            _fontFamily = _fontCollection.Add(fontPath);
+            _typeface = SKTypeface.FromFile(fontPath);
         }
         else
         {
-            // Fallback or handle appropriately
-            // For a global release, we should bundle a font file
-            throw new FileNotFoundException("Required font file not found at " + fontPath);
+            _typeface = SKTypeface.Default;
         }
     }
 
-    private async Task<Image<Rgba32>> LoadImageAsync(string? url, int width, int height, Color fallbackColor)
+    private async Task<SKBitmap> LoadBitmapAsync(string? url)
     {
-        if (string.IsNullOrEmpty(url))
-        {
-            return new Image<Rgba32>(width, height, fallbackColor);
-        }
+        if (string.IsNullOrEmpty(url)) return null;
 
         try
         {
             var client = _httpClientFactory.CreateClient();
             var bytes = await client.GetByteArrayAsync(url);
-            var image = Image.Load<Rgba32>(bytes);
-            image.Mutate(x => x.Resize(new ResizeOptions
-            {
-                Size = new Size(width, height),
-                Mode = ResizeMode.Crop
-            }));
-            return image;
+            return SKBitmap.Decode(bytes);
         }
         catch
         {
-            return new Image<Rgba32>(width, height, fallbackColor);
+            return null;
         }
     }
 
-    private static IPath CreateCircularPath(int x, int y, int radius)
+    private void DrawCircularAvatar(SKCanvas canvas, SKBitmap avatar, float x, float y, float size)
     {
-        return new EllipsePolygon(x, y, radius * 2);
-    }
+        if (avatar == null) return;
 
-    private void ApplyCircularMask(Image image)
-    {
-        int size = Math.Min(image.Width, image.Height);
-        var radius = size / 2;
-        var center = new PointF(radius, radius);
+        using var paint = new SKPaint { IsAntialias = true };
+        using var path = new SKPath();
         
-        image.Mutate(x => x.Clip(new EllipsePolygon(center, radius)));
+        float radius = size / 2;
+        path.AddCircle(x + radius, y + radius, radius);
+        
+        canvas.Save();
+        canvas.ClipPath(path);
+        
+        var rect = new SKRect(x, y, x + size, y + size);
+        canvas.DrawBitmap(avatar, rect, paint);
+        
+        canvas.Restore();
     }
 
     public async Task<byte[]> CreateRankCardAsync(string username, int level, int rank, long currentXp, long requiredXp, string? avatarUrl, string? colorHex, string? backgroundUrl)
@@ -80,98 +67,87 @@ public class VisualService
         int width = 900;
         int height = 250;
 
-        Color themeColor = Color.ParseHex(colorHex ?? "#5865F2");
-        Color bgColor = Color.ParseHex("#23272A");
+        using var surface = SKSurface.Create(new SKImageInfo(width, height));
+        var canvas = surface.Canvas;
 
-        using var image = await LoadImageAsync(backgroundUrl, width, height, bgColor);
-        using var avatar = await LoadImageAsync(avatarUrl, 180, 180, Color.Transparent);
+        // Background
+        var bgBitmap = await LoadBitmapAsync(backgroundUrl);
+        if (bgBitmap != null)
+        {
+            canvas.DrawBitmap(bgBitmap, new SKRect(0, 0, width, height));
+        }
+        else
+        {
+            canvas.Clear(SKColor.Parse("#23272A"));
+        }
 
-        // Circular Avatar
-        avatar.Mutate(x => {
-            x.Resize(180, 180);
-            var radius = 90;
-            var center = new PointF(radius, radius);
-            x.Clip(new EllipsePolygon(center, radius));
-        });
-
-        // Composite Avatar
-        image.Mutate(x => x.DrawImage(avatar, new Point(40, 35), 1f));
+        // Avatar
+        var avatarBitmap = await LoadBitmapAsync(avatarUrl);
+        DrawCircularAvatar(canvas, avatarBitmap, 40, 35, 180);
 
         // Progress Bar
-        int barWidth = 600;
-        int barHeight = 40;
-        int barX = 260;
-        int barY = 160;
-
-        image.Mutate(x => {
-            // Background Bar
-            x.Fill(Color.ParseHex("#484B4E"), new RectangularPolygon(barX, barY, barWidth, barHeight));
-
-            // Progress Fill
-            float progress = Math.Clamp((float)currentXp / requiredXp, 0, 1);
-            if (progress > 0)
-            {
-                x.Fill(themeColor, new RectangularPolygon(barX, barY, (int)(barWidth * progress), barHeight));
-            }
-        });
+        float progress = Math.Clamp((float)currentXp / requiredXp, 0, 1);
+        var barRect = new SKRect(260, 160, 860, 200);
+        
+        using (var paint = new SKPaint { Color = SKColor.Parse("#484B4E") })
+        {
+            canvas.DrawRect(barRect, paint);
+        }
+        
+        using (var paint = new SKPaint { Color = SKColor.Parse(colorHex ?? "#5865F2") })
+        {
+            var progressRect = new SKRect(260, 160, 260 + (600 * progress), 200);
+            canvas.DrawRect(progressRect, paint);
+        }
 
         // Text
-        var fontBig = _fontFamily.CreateFont(32, FontStyle.Bold);
-        var fontSmall = _fontFamily.CreateFont(18, FontStyle.Regular);
+        using (var paint = new SKPaint { Typeface = _typeface, Color = SKColors.White, IsAntialias = true })
+        {
+            paint.TextSize = 32;
+            canvas.DrawText(username, 260, 85, paint);
 
-        image.Mutate(x => {
-            x.DrawText(username, fontBig, Color.White, new PointF(260, 60));
-            x.DrawText($"RANK #{rank}  |  LEVEL {level}", fontSmall, Color.White, new PointF(260, 110));
-            x.DrawText($"{currentXp:N0} / {requiredXp:N0} XP", fontSmall, Color.White, new PointF(700, 110));
-        });
+            paint.TextSize = 18;
+            canvas.DrawText($"RANK #{rank}  |  LEVEL {level}", 260, 130, paint);
+            canvas.DrawText($"{currentXp:N0} / {requiredXp:N0} XP", 700, 130, paint);
+        }
 
-        using var ms = new MemoryStream();
-        await image.SaveAsPngAsync(ms);
-        return ms.ToArray();
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     public async Task<byte[]> CreateWelcomeCardAsync(string username, int memberCount, string? avatarUrl, string? backgroundUrl)
     {
         int width = 1024;
         int height = 450;
-        Color bgColor = Color.ParseHex("#23272A");
 
-        using var image = await LoadImageAsync(backgroundUrl, width, height, bgColor);
-        using var avatar = await LoadImageAsync(avatarUrl, 250, 250, Color.Transparent);
+        using var surface = SKSurface.Create(new SKImageInfo(width, height));
+        var canvas = surface.Canvas;
 
-        // Circular Avatar
-        avatar.Mutate(x => {
-            x.Resize(250, 250);
-            var radius = 125;
-            var center = new PointF(radius, radius);
-            x.Clip(new EllipsePolygon(center, radius));
-        });
+        var bgBitmap = await LoadBitmapAsync(backgroundUrl);
+        if (bgBitmap != null)
+        {
+            canvas.DrawBitmap(bgBitmap, new SKRect(0, 0, width, height));
+        }
+        else
+        {
+            canvas.Clear(SKColor.Parse("#23272A"));
+        }
 
-        // Composite Avatar (Centered)
-        image.Mutate(x => x.DrawImage(avatar, new Point((width - 250) / 2, 50), 1f));
+        var avatarBitmap = await LoadBitmapAsync(avatarUrl);
+        DrawCircularAvatar(canvas, avatarBitmap, (width - 250) / 2, 50, 250);
 
-        // Text
-        var fontBig = _fontFamily.CreateFont(64, FontStyle.Bold);
-        var fontSmall = _fontFamily.CreateFont(32, FontStyle.Regular);
+        using (var paint = new SKPaint { Typeface = _typeface, Color = SKColors.White, IsAntialias = true, TextAlign = SKTextAlign.Center })
+        {
+            paint.TextSize = 64;
+            canvas.DrawText("WELCOME", width / 2, 360, paint);
 
-        image.Mutate(x => {
-            // "WELCOME" centered
-            var welcomeText = "WELCOME";
-            x.DrawText(new RichTextOptions(fontBig) { 
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Origin = new PointF(width / 2, 320)
-            }, welcomeText, Color.White);
+            paint.TextSize = 32;
+            canvas.DrawText($"{username}  |  Member #{memberCount}", width / 2, 410, paint);
+        }
 
-            // Username centered
-            var subText = $"{username}  |  Member #{memberCount}";
-            x.DrawText(new RichTextOptions(fontSmall) { 
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Origin = new PointF(width / 2, 390)
-            }, subText, Color.White);
-        });
-
-        using var ms = new MemoryStream();
-        await image.SaveAsPngAsync(ms);
-        return ms.ToArray();
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 }

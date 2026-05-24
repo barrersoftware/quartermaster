@@ -12,7 +12,7 @@ echo "========================================="
 # Detect OS
 OS="$(uname -s)"
 case "${OS}" in
-    Linux*)     DISTRO=$(lsb_release -i | cut -f 2-);;
+    Linux*)     DISTRO=$(lsb_release -i | cut -f 2- 2>/dev/null || echo "Linux");;
     Darwin*)    DISTRO="macOS";;
     *)          DISTRO="UNKNOWN"
 esac
@@ -35,13 +35,13 @@ if ! command -v dotnet &> /dev/null; then
             . /etc/os-release
             case "$ID" in
                 ubuntu|debian)
-                    sudo apt-get update && sudo apt-get install -y dotnet-sdk-8.0
+                    sudo apt-get update && sudo apt-get install -y dotnet-sdk-10.0
                     ;;
                 fedora)
-                    sudo dnf install -y dotnet-sdk-8.0
+                    sudo dnf install -y dotnet-sdk-10.0
                     ;;
                 centos|rhel)
-                    sudo yum install -y dotnet-sdk-8.0
+                    sudo yum install -y dotnet-sdk-10.0
                     ;;
                 arch)
                     sudo pacman -S --noconfirm dotnet-sdk
@@ -57,12 +57,62 @@ else
     echo ".NET SDK is already installed: $(dotnet --version)"
 fi
 
-# 2. Build the solution
-echo "Restoring and building Quartermaster..."
-dotnet build --configuration Release
+# 2. Build and Publish
+echo "Restoring and publishing Quartermaster..."
+dotnet publish --configuration Release --output ./publish
+
+# 3. Optional: Install as systemd service (Linux only)
+if [[ "$OS" == "Linux" ]]; then
+    read -p "Would you like to install Quartermaster as a systemd service? (Y/N): " install_service
+    if [[ "$install_service" == "Y" || "$install_service" == "y" ]]; then
+        USER_NAME=$(whoami)
+        CUR_DIR=$(pwd)
+        
+        echo "Creating systemd service files..."
+        
+        # Bot Service
+        cat <<EOF | sudo tee /etc/systemd/system/quartermaster-bot.service
+[Unit]
+Description=Quartermaster Discord Bot
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=$CUR_DIR/publish
+ExecStart=$CUR_DIR/publish/Quartermaster.Bot --contentRoot $CUR_DIR
+User=$USER_NAME
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+        # Web Service
+        cat <<EOF | sudo tee /etc/systemd/system/quartermaster-web.service
+[Unit]
+Description=Quartermaster Web Dashboard
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=$CUR_DIR/publish
+ExecStart=$CUR_DIR/publish/Quartermaster.Web --contentRoot $CUR_DIR
+User=$USER_NAME
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+        sudo systemctl daemon-reload
+        echo "✅ systemd services created. Use 'sudo systemctl start quartermaster-bot' to launch."
+    fi
+fi
 
 echo "========================================="
 echo "  Setup Complete!"
 echo "  1. Edit 'appsettings.json' with your tokens."
-echo "  2. Run './start.sh' to launch."
+echo "  2. Run './start.sh' to launch manually or use systemctl."
 echo "========================================="

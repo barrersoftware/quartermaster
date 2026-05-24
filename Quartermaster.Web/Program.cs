@@ -6,6 +6,10 @@ using Quartermaster.Core.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add service support
+builder.Host.UseWindowsService(options => options.ServiceName = "QuartermasterWeb");
+builder.Host.UseSystemd();
+
 // Load global configuration from solution root
 builder.Configuration.AddJsonFile("../appsettings.json", optional: false, reloadOnChange: true);
 
