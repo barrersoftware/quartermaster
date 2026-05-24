@@ -10,8 +10,21 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService(options => options.ServiceName = "QuartermasterWeb");
 builder.Host.UseSystemd();
 
-// Load global configuration from solution root
-builder.Configuration.AddJsonFile("../appsettings.json", optional: false, reloadOnChange: true);
+// Robust configuration loading
+string configName = "appsettings.json";
+string configPath = "";
+
+if (File.Exists(configName)) configPath = Path.GetFullPath(configName);
+else if (File.Exists(Path.Combine(AppContext.BaseDirectory, configName))) configPath = Path.Combine(AppContext.BaseDirectory, configName);
+else if (File.Exists(Path.Combine("..", configName))) configPath = Path.GetFullPath(Path.Combine("..", configName));
+
+if (string.IsNullOrEmpty(configPath))
+{
+    // Web needs to stay alive if possible, or fail gracefully
+    throw new FileNotFoundException("appsettings.json not found in current, base, or parent directory!");
+}
+
+builder.Configuration.AddJsonFile(configPath, optional: false, reloadOnChange: true);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -20,7 +33,9 @@ builder.Services.AddScoped<Quartermaster.Web.Services.DiscordApiService>();
 
 // Data Services
 var dbPath = builder.Configuration.GetValue<string>("Bot:DatabasePath") ?? "bot.db";
-builder.Services.AddSingleton<IDatabaseService>(new SqliteDatabaseService(dbPath));
+var dbService = new SqliteDatabaseService(dbPath);
+await dbService.InitializeDatabaseAsync();
+builder.Services.AddSingleton<IDatabaseService>(dbService);
 
 // Authentication
 builder.Services.AddAuthentication(options =>

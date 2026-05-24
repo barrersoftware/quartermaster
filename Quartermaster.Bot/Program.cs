@@ -13,8 +13,24 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddWindowsService(options => options.ServiceName = "QuartermasterBot");
 builder.Services.AddSystemd();
 
-// Load global configuration from solution root
-builder.Configuration.AddJsonFile("../appsettings.json", optional: false, reloadOnChange: true);
+// Robust configuration loading
+string configName = "appsettings.json";
+string configPath = "";
+
+// 1. Check current directory
+if (File.Exists(configName)) configPath = Path.GetFullPath(configName);
+// 2. Check execution directory
+else if (File.Exists(Path.Combine(AppContext.BaseDirectory, configName))) configPath = Path.Combine(AppContext.BaseDirectory, configName);
+// 3. Check parent directory (for solution-level config)
+else if (File.Exists(Path.Combine("..", configName))) configPath = Path.GetFullPath(Path.Combine("..", configName));
+
+if (string.IsNullOrEmpty(configPath))
+{
+    Console.WriteLine("❌ ERROR: appsettings.json not found in current, base, or parent directory!");
+    return;
+}
+
+builder.Configuration.AddJsonFile(configPath, optional: false, reloadOnChange: true);
 
 // Configuration
 builder.Services.Configure<BotConfiguration>(builder.Configuration.GetSection("Bot"));
@@ -27,12 +43,14 @@ var config = new DiscordSocketConfig
 };
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<DiscordSocketClient>();
-builder.Services.AddSingleton<CommandService>();
-builder.Services.AddSingleton<InteractionService>();
+builder.Services.AddSingleton(x => new CommandService());
+builder.Services.AddSingleton(x => new InteractionService(x.GetRequiredService<DiscordSocketClient>()));
 
 // Data Services
 var dbPath = builder.Configuration.GetValue<string>("Bot:DatabasePath") ?? "bot.db";
-builder.Services.AddSingleton<IDatabaseService>(new SqliteDatabaseService(dbPath));
+var dbService = new SqliteDatabaseService(dbPath);
+await dbService.InitializeDatabaseAsync();
+builder.Services.AddSingleton<IDatabaseService>(dbService);
 
 // Core Logic Services
 builder.Services.AddSingleton<Quartermaster.Core.Services.LevelingService>();

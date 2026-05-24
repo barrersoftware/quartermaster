@@ -52,10 +52,12 @@ public interface IDatabaseService
     Task UpdateStarboardSettingsAsync(StarboardSetting settings);
     Task<string?> GetStarboardMessageIdAsync(string originalMessageId);
     Task AddStarboardMessageAsync(string guildId, string originalMessageId, string starboardMessageId);
+    Task InitializeDatabaseAsync();
 }
 
 public class SqliteDatabaseService : IDatabaseService
 {
+    // ... rest of implementation will follow in next turn to avoid large replacement failure
     // ... rest of implementation will follow in next turn to avoid large replacement failure
     private readonly string _connectionString;
 
@@ -357,5 +359,214 @@ public class SqliteDatabaseService : IDatabaseService
         using var db = GetConnection();
         await db.ExecuteAsync("INSERT INTO starboard_messages (guild_id, original_message_id, starboard_message_id) VALUES (@guildId, @originalMessageId, @starboardMessageId)", 
             new { guildId, originalMessageId, starboardMessageId });
+    }
+
+    public async Task InitializeDatabaseAsync()
+    {
+        using var db = GetConnection();
+        
+        // Porting the exact JS init logic to C#
+        await db.ExecuteAsync(@"
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT NOT NULL,
+                guild_id TEXT NOT NULL,
+                xp INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 0,
+                last_message INTEGER DEFAULT 0,
+                gold INTEGER DEFAULT 0,
+                last_daily INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, guild_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS custom_commands (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                command_name TEXT NOT NULL,
+                response TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                created_at INTEGER DEFAULT (strftime('%s', 'now')),
+                UNIQUE(guild_id, command_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS warnings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                guild_id TEXT NOT NULL,
+                moderator_id TEXT NOT NULL,
+                reason TEXT,
+                timestamp INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS guild_settings (
+                guild_id TEXT PRIMARY KEY,
+                welcome_channel TEXT,
+                leave_channel TEXT,
+                log_channel TEXT,
+                mute_role TEXT,
+                rank_card_color TEXT DEFAULT '#5865F2',
+                auto_role TEXT,
+                mod_roles TEXT DEFAULT '[]',
+                rank_background TEXT,
+                welcome_background TEXT,
+                level_up_channel TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS raid_settings (
+                guild_id TEXT PRIMARY KEY,
+                enabled INTEGER DEFAULT 0,
+                join_threshold INTEGER DEFAULT 5,
+                time_window INTEGER DEFAULT 10,
+                action TEXT DEFAULT 'kick',
+                alert_channel TEXT,
+                lockdown_duration INTEGER DEFAULT 300,
+                whitelist_roles TEXT DEFAULT '[]',
+                verification_level INTEGER DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS join_tracking (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                guild_id TEXT NOT NULL,
+                joined_at INTEGER DEFAULT (strftime('%s', 'now')),
+                account_created INTEGER,
+                is_suspicious INTEGER DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS raid_incidents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                detected_at INTEGER DEFAULT (strftime('%s', 'now')),
+                user_count INTEGER,
+                action_taken TEXT,
+                users_affected TEXT,
+                resolved INTEGER DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS role_rewards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                level INTEGER NOT NULL,
+                role_id TEXT NOT NULL,
+                UNIQUE(guild_id, level)
+            );
+
+            CREATE TABLE IF NOT EXISTS automod_settings (
+                guild_id TEXT PRIMARY KEY,
+                spam_enabled INTEGER DEFAULT 0,
+                spam_threshold INTEGER DEFAULT 5,
+                links_enabled INTEGER DEFAULT 0,
+                invites_enabled INTEGER DEFAULT 0,
+                badwords_enabled INTEGER DEFAULT 0,
+                emoji_spam_enabled INTEGER DEFAULT 0,
+                emoji_threshold INTEGER DEFAULT 10,
+                caps_spam_enabled INTEGER DEFAULT 0,
+                caps_threshold INTEGER DEFAULT 70,
+                mention_spam_enabled INTEGER DEFAULT 0,
+                mention_threshold INTEGER DEFAULT 5
+            );
+
+            CREATE TABLE IF NOT EXISTS word_blacklist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                word TEXT NOT NULL,
+                UNIQUE(guild_id, word)
+            );
+
+            CREATE TABLE IF NOT EXISTS leveling_multipliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                multiplier REAL DEFAULT 1.0,
+                UNIQUE(guild_id, target_id, type)
+            );
+
+            CREATE TABLE IF NOT EXISTS reaction_roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                emoji TEXT NOT NULL,
+                role_id TEXT NOT NULL,
+                UNIQUE(guild_id, message_id, emoji)
+            );
+
+            CREATE TABLE IF NOT EXISTS advanced_triggers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                trigger_phrase TEXT NOT NULL,
+                response TEXT NOT NULL,
+                type TEXT DEFAULT 'text',
+                created_by TEXT,
+                UNIQUE(guild_id, trigger_phrase)
+            );
+
+            CREATE TABLE IF NOT EXISTS giveaways (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                channel_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                prize TEXT NOT NULL,
+                winner_count INTEGER DEFAULT 1,
+                end_time INTEGER NOT NULL,
+                ended INTEGER DEFAULT 0,
+                winners TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS starboard_settings (
+                guild_id TEXT PRIMARY KEY,
+                channel_id TEXT,
+                emoji TEXT DEFAULT '⭐',
+                threshold INTEGER DEFAULT 3
+            );
+
+            CREATE TABLE IF NOT EXISTS starboard_messages (
+                guild_id TEXT NOT NULL,
+                original_message_id TEXT PRIMARY KEY,
+                starboard_message_id TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS social_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                channel_name TEXT NOT NULL,
+                alert_channel_id TEXT NOT NULL,
+                last_notified_id TEXT,
+                UNIQUE(guild_id, platform, channel_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS shop_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                price INTEGER NOT NULL,
+                role_id TEXT,
+                UNIQUE(guild_id, name)
+            );
+
+            CREATE TABLE IF NOT EXISTS inventory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                guild_id TEXT NOT NULL,
+                item_id INTEGER NOT NULL,
+                purchased_at INTEGER DEFAULT (strftime('%s', 'now')),
+                FOREIGN KEY (item_id) REFERENCES shop_items(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                user_id TEXT,
+                content TEXT,
+                timestamp INTEGER DEFAULT (strftime('%s', 'now'))
+            );
+        ");
+
+        // Migration: Add columns if they don't exist (C# specific migrations can go here)
+        try { await db.ExecuteAsync("ALTER TABLE users ADD COLUMN gold INTEGER DEFAULT 0"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE users ADD COLUMN last_daily INTEGER DEFAULT 0"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN level_up_channel TEXT"); } catch { }
     }
 }
