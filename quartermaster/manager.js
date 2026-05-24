@@ -1,5 +1,6 @@
 const db = require('./database');
 const { EmbedBuilder } = require('discord.js');
+const axios = require('axios');
 
 class QuartermasterManager {
     constructor(client) {
@@ -12,7 +13,81 @@ class QuartermasterManager {
         setInterval(() => {
             this.checkGiveaways();
             this.rewardVoiceActivity();
+            this.checkSocialAlerts();
         }, this.checkInterval);
+    }
+
+    async checkSocialAlerts() {
+        const alerts = db.getAllSocialAlerts.all();
+        if (alerts.length === 0) return;
+
+        for (const alert of alerts) {
+            try {
+                if (alert.platform === 'twitch') {
+                    await this.pollTwitch(alert);
+                } else if (alert.platform === 'youtube') {
+                    await this.pollYouTube(alert);
+                }
+            } catch (error) {
+                console.error(`Social Poll Error (${alert.platform}/${alert.channel_name}):`, error.message);
+            }
+        }
+    }
+
+    async pollTwitch(alert) {
+        const clientId = process.env.TWITCH_CLIENT_ID;
+        const accessToken = process.env.TWITCH_ACCESS_TOKEN;
+
+        if (!clientId || !accessToken) return;
+
+        const response = await axios.get(`https://api.twitch.tv/helix/streams?user_login=${alert.channel_name}`, {
+            headers: {
+                'Client-ID': clientId,
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        const stream = response.data.data[0];
+        if (stream && stream.id !== alert.last_notified_id) {
+            const channel = await this.client.channels.fetch(alert.alert_channel_id).catch(() => null);
+            if (channel) {
+                const embed = new EmbedBuilder()
+                    .setColor('#6441A5')
+                    .setTitle(`🎮 ${stream.user_name} is now LIVE on Twitch!`)
+                    .setURL(`https://twitch.tv/${stream.user_login}`)
+                    .setDescription(`**Playing:** ${stream.game_name}\n**Title:** ${stream.title}`)
+                    .setImage(stream.thumbnail_url.replace('{width}', '1280').replace('{height}', '720'))
+                    .setTimestamp();
+
+                await channel.send({ content: `📢 **${stream.user_name}** just went live!`, embeds: [embed] });
+                db.updateLastNotified.run(stream.id, alert.id);
+            }
+        }
+    }
+
+    async pollYouTube(alert) {
+        const apiKey = process.env.YOUTUBE_API_KEY;
+        if (!apiKey) return;
+
+        // Note: channel_name here is expected to be the Channel ID for reliability
+        const response = await axios.get(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${alert.channel_name}&maxResults=1&order=date&type=video&key=${apiKey}`);
+
+        const video = response.data.items[0];
+        if (video && video.id.videoId !== alert.last_notified_id) {
+            const channel = await this.client.channels.fetch(alert.alert_channel_id).catch(() => null);
+            if (channel) {
+                const embed = new EmbedBuilder()
+                    .setColor('#FF0000')
+                    .setTitle(`🎥 New Video: ${video.snippet.title}`)
+                    .setURL(`https://www.youtube.com/watch?v=${video.id.videoId}`)
+                    .setDescription(video.snippet.description.substring(0, 200) + '...')
+                    .setImage(video.snippet.thumbnails.high.url)
+                    .setTimestamp();
+
+                await channel.send({ content: `📢 **${video.snippet.channelTitle}** just posted a new video!`, embeds: [embed] });
+                db.updateLastNotified.run(video.id.videoId, alert.id);
+            }
+        }
     }
 
     async rewardVoiceActivity() {

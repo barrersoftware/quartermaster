@@ -180,9 +180,23 @@ function initDatabase() {
             spam_threshold INTEGER DEFAULT 5,
             links_enabled INTEGER DEFAULT 0,
             invites_enabled INTEGER DEFAULT 0,
-            badwords_enabled INTEGER DEFAULT 0
+            badwords_enabled INTEGER DEFAULT 0,
+            emoji_spam_enabled INTEGER DEFAULT 0,
+            emoji_threshold INTEGER DEFAULT 10,
+            caps_spam_enabled INTEGER DEFAULT 0,
+            caps_threshold INTEGER DEFAULT 70, -- Percentage
+            mention_spam_enabled INTEGER DEFAULT 0,
+            mention_threshold INTEGER DEFAULT 5
         )
     `);
+
+    // Migration for new automod columns
+    try { db.exec("ALTER TABLE automod_settings ADD COLUMN emoji_spam_enabled INTEGER DEFAULT 0"); } catch (e) {}
+    try { db.exec("ALTER TABLE automod_settings ADD COLUMN emoji_threshold INTEGER DEFAULT 10"); } catch (e) {}
+    try { db.exec("ALTER TABLE automod_settings ADD COLUMN caps_spam_enabled INTEGER DEFAULT 0"); } catch (e) {}
+    try { db.exec("ALTER TABLE automod_settings ADD COLUMN caps_threshold INTEGER DEFAULT 70"); } catch (e) {}
+    try { db.exec("ALTER TABLE automod_settings ADD COLUMN mention_spam_enabled INTEGER DEFAULT 0"); } catch (e) {}
+    try { db.exec("ALTER TABLE automod_settings ADD COLUMN mention_threshold INTEGER DEFAULT 5"); } catch (e) {}
 
     // Word blacklist table
     db.exec(`
@@ -313,11 +327,21 @@ function addXP(userId, guildId, xp) {
 }
 
 function calculateLevel(xp) {
-    return Math.floor(0.1 * Math.sqrt(xp));
+    // MEE6 Cubic Approximation (Inverse of the XP formula)
+    // Formula: XP = 100x + 25x(x-1) + (5(x-1)x(2x-1))/6
+    // We iterate to find the exact level because the cubic inverse is complex.
+    let level = 0;
+    while (calculateXPForLevel(level + 1) <= xp) {
+        level++;
+    }
+    return level;
 }
 
 function calculateXPForLevel(level) {
-    return Math.pow(level / 0.1, 2);
+    if (level <= 0) return 0;
+    const x = level;
+    // MEE6 Official Cubic XP Formula
+    return Math.floor(100 * x + 25 * x * (x - 1) + (5 * (x - 1) * x * (2 * x - 1)) / 6);
 }
 
 // Custom commands functions

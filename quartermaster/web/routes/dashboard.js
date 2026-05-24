@@ -46,7 +46,7 @@ router.get('/server/:guildId', async (req, res) => {
         return res.render('dashboard/invite', {
             user: req.user,
             guild: userGuild,
-            inviteUrl: `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot&guild_id=${guildId}`
+            inviteUrl: `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${guildId}`
         });
     }
 

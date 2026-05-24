@@ -1,10 +1,13 @@
 const db = require('../database');
+const Mee6MigrationService = require('../mee6Migration');
 
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
         // 1. Basic Filters
         if (message.author.bot || !message.guild) return;
+
+        const migrationService = new Mee6MigrationService(client);
 
         // 2. Auto-Moderation (High Priority)
         const automodCommand = client.commands.get('automod');
@@ -21,7 +24,14 @@ module.exports = {
             try {
                 const userId = message.author.id;
                 const guildId = message.guild.id;
-                const userData = db.getUserData.get(userId, guildId);
+                let userData = db.getUserData.get(userId, guildId);
+
+                // --- SHADOW SYNC: Hydrate from MEE6 if user is new to us ---
+                if (!userData) {
+                    await migrationService.hydrateUser(guildId, userId);
+                    userData = db.getUserData.get(userId, guildId);
+                }
+
                 const now = Date.now();
 
                 if (!userData || now - userData.last_message >= config.leveling.cooldown * 1000) {
