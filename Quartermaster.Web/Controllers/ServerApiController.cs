@@ -34,6 +34,17 @@ public class ServerApiController : ControllerBase
         return Ok(new { success = true });
     }
 
+    [HttpPost("settings/leveling")]
+    public async Task<IActionResult> UpdateLeveling(string guildId, [FromBody] LevelingUpdateModel model)
+    {
+        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+        settings.LevelingEnabled = model.Enabled ? 1 : 0;
+        if (model.LevelUpMessage != null) settings.LevelUpMessage = model.LevelUpMessage;
+        if (model.LevelUpChannel != null) settings.LevelUpChannel = model.LevelUpChannel;
+        await SaveSettings(guildId, settings);
+        return Ok(new { success = true });
+    }
+
     [HttpPost("automod")]
     public async Task<IActionResult> UpdateAutomod(string guildId, [FromBody] AutomodSetting model)
     {
@@ -179,5 +190,12 @@ public class ServerApiController : ControllerBase
         public string? RankCardColor { get; set; }
         public string? RankBackground { get; set; }
         public string? WelcomeBackground { get; set; }
+    }
+
+    public class LevelingUpdateModel
+    {
+        public bool Enabled { get; set; } = true;
+        public string? LevelUpMessage { get; set; }
+        public string? LevelUpChannel { get; set; }
     }
 }

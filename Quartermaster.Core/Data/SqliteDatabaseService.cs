@@ -154,9 +154,9 @@ public class SqliteDatabaseService : IDatabaseService
         using var db = GetConnection();
         await db.ExecuteAsync(@"
             INSERT INTO guild_settings 
-            (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background, level_up_channel)
+            (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background, level_up_channel, leveling_enabled, level_up_message)
             VALUES 
-            (@GuildId, @WelcomeChannel, @LeaveChannel, @LogChannel, @MuteRole, @RankCardColor, @AutoRole, @ModRoles, @RankBackground, @WelcomeBackground, @LevelUpChannel)
+            (@GuildId, @WelcomeChannel, @LeaveChannel, @LogChannel, @MuteRole, @RankCardColor, @AutoRole, @ModRoles, @RankBackground, @WelcomeBackground, @LevelUpChannel, @LevelingEnabled, @LevelUpMessage)
             ON CONFLICT(guild_id) DO UPDATE SET
                 welcome_channel = @WelcomeChannel,
                 leave_channel = @LeaveChannel,
@@ -167,7 +167,9 @@ public class SqliteDatabaseService : IDatabaseService
                 mod_roles = @ModRoles,
                 rank_background = @RankBackground,
                 welcome_background = @WelcomeBackground,
-                level_up_channel = @LevelUpChannel",
+                level_up_channel = @LevelUpChannel,
+                leveling_enabled = @LevelingEnabled,
+                level_up_message = @LevelUpMessage",
             s);
     }
 
@@ -661,5 +663,7 @@ public class SqliteDatabaseService : IDatabaseService
         try { await db.ExecuteAsync("ALTER TABLE users ADD COLUMN gold INTEGER DEFAULT 0"); } catch { }
         try { await db.ExecuteAsync("ALTER TABLE users ADD COLUMN last_daily INTEGER DEFAULT 0"); } catch { }
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN level_up_channel TEXT"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN leveling_enabled INTEGER DEFAULT 1"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN level_up_message TEXT"); } catch { }
     }
 }

@@ -1,7 +1,7 @@
 @model IEnumerable<Quartermaster.Core.Models.SocialAlert>
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
-    var channels = ViewBag.Channels as IEnumerable<dynamic> ?? new List<dynamic>();
+    var channels = ViewBag.Channels as IEnumerable<Quartermaster.Web.Services.DiscordChannel> ?? new List<Quartermaster.Web.Services.DiscordChannel>();
     ViewData["Title"] = "Social Alerts - " + guild?.Name;
 }
 
@@ -43,7 +43,7 @@
                                     </span>
                                 </td>
                                 <td><code>@alert.ChannelName</code></td>
-                                <td>#@(channels.FirstOrDefault(c => c.id == alert.AlertChannelId)?.name ?? alert.AlertChannelId)</td>
+                                <td>#@(channels.FirstOrDefault(c => c.Id == alert.AlertChannelId)?.Name ?? alert.AlertChannelId)</td>
                                 <td>
                                     <button class="btn btn-small btn-danger" onclick="deleteAlert('@alert.Platform', '@alert.ChannelName')">Remove</button>
                                 </td>
@@ -72,7 +72,7 @@
                         <select name="alert_channel_id" class="input-select" required>
                             @foreach (var ch in channels)
                             {
-                                <option value="@ch.id">#@ch.name</option>
+                                <option value="@ch.Id">#@ch.Name</option>
                             }
                         </select>
                     </div>

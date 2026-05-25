@@ -1,6 +1,7 @@
 @model Quartermaster.Core.Models.GuildSetting
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var channels = ViewBag.Channels as IEnumerable<Quartermaster.Web.Services.DiscordChannel> ?? new List<Quartermaster.Web.Services.DiscordChannel>();
     ViewData["Title"] = "Leveling - " + guild?.Name;
 }
 
@@ -20,7 +21,7 @@
             <form id="levelingForm">
                 <div class="form-group">
                     <label class="toggle-label">
-                        <input type="checkbox" name="enabled" checked> <!-- We'll need to load config.json here too or move to DB -->
+                        <input type="checkbox" name="enabled" @(Model.LevelingEnabled == 1 ? "checked" : "")>
                         <span class="toggle-slider"></span>
                         Enable Leveling System
                     </label>
@@ -28,7 +29,7 @@
 
                 <div class="form-group">
                     <label>Level Up Message</label>
-                    <input type="text" name="levelUpMessage" value="Congratulations {user}, you just advanced to level {level}!" class="input-field">
+                    <input type="text" name="levelUpMessage" value="@(Model.LevelUpMessage ?? "Congratulations {user}, you just advanced to level {level}!")" class="input-field">
                     <small>Use {user} for mention, {level} for level number</small>
                 </div>
 
@@ -44,7 +45,12 @@
                     <label>Announcement Channel</label>
                     <select name="level_up_channel" class="input-select">
                         <option value="">In the channel where it happened (Current Channel)</option>
-                        <!-- Channels should be passed in via ViewComponent or ViewBag -->
+                        @foreach (var channel in channels)
+                        {
+                            <option value="@channel.Id" selected="@(Model.LevelUpChannel == channel.Id)">
+                                #@channel.Name
+                            </option>
+                        }
                     </select>
                     <small>Choose where the bot should post level-up messages.</small>
                 </div>
@@ -76,8 +82,36 @@
 @section Scripts {
     <script>
         const guildId = '@guild?.Id';
-        
-        // Form submission logic (similar to JS version but hitting C# API)
+
+        document.getElementById('levelingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/settings/leveling`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    enabled: formData.get('enabled') === 'on',
+                    levelUpMessage: formData.get('levelUpMessage')
+                })
+            });
+            const data = await response.json();
+            alert(data.success ? 'Leveling settings saved!' : 'Error saving settings');
+        });
+
+        document.getElementById('announcementForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/settings/leveling`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    levelUpChannel: formData.get('level_up_channel') || null
+                })
+            });
+            const data = await response.json();
+            alert(data.success ? 'Announcement settings saved!' : 'Error saving settings');
+        });
+
         document.getElementById('visualForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);

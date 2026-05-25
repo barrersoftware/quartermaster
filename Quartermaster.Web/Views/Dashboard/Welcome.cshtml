@@ -1,8 +1,8 @@
 @model Quartermaster.Core.Models.GuildSetting
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
-    var channels = ViewBag.Channels as IEnumerable<dynamic> ?? new List<dynamic>();
-    var roles = ViewBag.Roles as IEnumerable<dynamic> ?? new List<dynamic>();
+    var channels = ViewBag.Channels as IEnumerable<Quartermaster.Web.Services.DiscordChannel> ?? new List<Quartermaster.Web.Services.DiscordChannel>();
+    var roles = ViewBag.Roles as IEnumerable<Quartermaster.Web.Services.DiscordRole> ?? new List<Quartermaster.Web.Services.DiscordRole>();
     // Simplified: Getting welcome settings from Model (GuildSetting)
     ViewData["Title"] = "Welcome - " + guild?.Name;
 }
@@ -29,8 +29,8 @@
                         <option value="">None (Disabled)</option>
                         @foreach (var role in roles)
                         {
-                            <option value="@role.id" selected="@(Model.AutoRole == role.id)">
-                                @@@role.name
+                            <option value="@role.Id" selected="@(Model.AutoRole == role.Id)">
+                                @@@role.Name
                             </option>
                         }
                     </select>
@@ -41,8 +41,8 @@
                     <select name="welcomeChannel" class="input-select">
                         @foreach (var channel in channels)
                         {
-                            <option value="@channel.name" selected="@(Model.WelcomeChannel == channel.name)">
-                                #@channel.name
+                            <option value="@channel.Id" selected="@(Model.WelcomeChannel == channel.Id)">
+                                #@channel.Name
                             </option>
                         }
                     </select>
