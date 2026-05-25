@@ -85,7 +85,7 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
-            data.enabled = formData.get('enabled') === 'on';
+            data.enabled = formData.get('enabled') === 'on' ? 1 : 0;
 
             const response = await fetch(`/api/server/${guildId}/raid`, {
                 method: 'POST',

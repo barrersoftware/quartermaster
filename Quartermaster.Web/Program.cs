@@ -27,7 +27,11 @@ if (string.IsNullOrEmpty(configPath))
 builder.Configuration.AddJsonFile(configPath, optional: false, reloadOnChange: true);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews().AddJsonOptions(options =>
+{
+    // HTML forms serialize all values as strings; allow reading ints/longs from JSON strings.
+    options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
+});
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<Quartermaster.Web.Services.DiscordApiService>();
 

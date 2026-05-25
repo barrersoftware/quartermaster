@@ -1,7 +1,7 @@
 @model IEnumerable<Quartermaster.Core.Models.ReactionRole>
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
-    var roles = ViewBag.Roles as IEnumerable<dynamic> ?? new List<dynamic>();
+    var roles = ViewBag.Roles as IEnumerable<Quartermaster.Web.Services.DiscordRole> ?? new List<Quartermaster.Web.Services.DiscordRole>();
     ViewData["Title"] = "Reaction Roles - " + guild?.Name;
 }
 
@@ -36,13 +36,13 @@
                     {
                         foreach (var rr in Model)
                         {
-                            var role = roles.FirstOrDefault(r => r.id == rr.RoleId);
+                            var role = roles.FirstOrDefault(r => r.Id == rr.RoleId);
                             <tr>
                                 <td><code>@rr.MessageId</code></td>
                                 <td style="font-size:1.2rem;">@rr.Emoji</td>
                                 <td>
-                                    <span class="role-badge" style="background-color: @(role != null ? role.hexColor : "#99AAB5")">
-                                        @@@(role?.name ?? rr.RoleId)
+                                    <span class="role-badge" style="background-color: @(role != null ? role.HexColor : "#99AAB5")">
+                                        @@@(role?.Name ?? rr.RoleId)
                                     </span>
                                 </td>
                                 <td>
@@ -59,19 +59,19 @@
                 <form id="addReactionRoleForm" class="form-row" style="margin-top: 15px;">
                     <div class="form-group">
                         <label>Message ID</label>
-                        <input type="text" name="message_id" class="input-field" placeholder="Right click message -> Copy ID" required>
+                        <input type="text" name="MessageId" class="input-field" placeholder="Right click message -> Copy ID" required>
                     </div>
                     <div class="form-group">
                         <label>Emoji</label>
-                        <input type="text" name="emoji" class="input-field" placeholder="e.g. ✅" required>
+                        <input type="text" name="Emoji" class="input-field" placeholder="e.g. ✅" required>
                     </div>
                     <div class="form-group">
                         <label>Role to Award</label>
-                        <select name="role_id" class="input-select" required>
+                        <select name="RoleId" class="input-select" required>
                             <option value="">Select a role...</option>
                             @foreach (var role in roles)
                             {
-                                <option value="@role.id">@@@role.name</option>
+                                <option value="@role.Id">@@@role.Name</option>
                             }
                         </select>
                     </div>

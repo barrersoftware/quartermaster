@@ -1,7 +1,7 @@
 @model Quartermaster.Core.Models.GuildSetting
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
-    var roles = ViewBag.Roles as IEnumerable<dynamic> ?? new List<dynamic>();
+    var roles = ViewBag.Roles as IEnumerable<Quartermaster.Web.Services.DiscordRole> ?? new List<Quartermaster.Web.Services.DiscordRole>();
     var modRoles = Model.ModRoles != null ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(Model.ModRoles) : new List<string>();
     ViewData["Title"] = "Permissions - " + guild?.Name;
 }
@@ -33,9 +33,9 @@
                     {
                         foreach (var roleId in modRoles)
                         {
-                            var role = roles.FirstOrDefault(r => r.id == roleId);
+                            var role = roles.FirstOrDefault(r => r.Id == roleId);
                             <div class="role-tag" style="background: var(--bg-tertiary); padding: 8px 15px; border-radius: 6px; display: flex; align-items: center; gap: 10px;">
-                                <span style="font-weight: 600;">@@@(role?.name ?? roleId)</span>
+                                <span style="font-weight: 600;">@@@(role?.Name ?? roleId)</span>
                                 <button onclick="removeRole('@roleId')" class="remove-role" style="background: none; border: none; color: var(--danger-color); cursor: pointer; font-size: 1.2rem;">&times;</button>
                             </div>
                         }
@@ -49,9 +49,9 @@
                             <option value="">Select a role...</option>
                             @foreach (var role in roles)
                             {
-                                if (!modRoles.Contains(role.id))
+                                if (!modRoles.Contains(role.Id))
                                 {
-                                    <option value="@role.id">@@@role.name</option>
+                                    <option value="@role.Id">@@@role.Name</option>
                                 }
                             }
                         </select>
