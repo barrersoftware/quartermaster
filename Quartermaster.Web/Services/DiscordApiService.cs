@@ -41,7 +41,8 @@ public class DiscordGuild
     public bool IsOwner { get; set; }
 
     [JsonPropertyName("permissions")]
-    public string Permissions { get; set; } = "0";
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public long Permissions { get; set; }
 
-    public bool CanManage => (long.Parse(Permissions) & 0x20) == 0x20 || IsOwner;
+    public bool CanManage => (Permissions & 0x20) == 0x20 || IsOwner;
 }
