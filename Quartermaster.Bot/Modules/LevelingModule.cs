@@ -35,8 +35,8 @@ public class LevelingModule : InteractionModuleBase<SocketInteractionContext>
 
         var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
         
-        // Calculate Rank (placeholder logic for now)
-        int rank = 1; 
+        // Calculate Actual Rank
+        int rank = await _db.GetUserRankAsync(user.Id.ToString(), guildId);
 
         var imageBytes = await _visuals.CreateRankCardAsync(
             user.Username,
@@ -56,8 +56,29 @@ public class LevelingModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("leaderboard", "View the server leaderboard")]
     public async Task LeaderboardAsync()
     {
-        // For now, let's just implement a placeholder
-        // In the real one, we'd fetch top users from DB
-        await RespondAsync("Leaderboard logic coming soon in C#!", ephemeral: true);
+        await DeferAsync();
+        var guildId = Context.Guild.Id.ToString();
+        var topUsers = await _db.GetLeaderboardAsync(guildId, 10);
+
+        var embed = new EmbedBuilder()
+            .WithTitle($"🏆 {Context.Guild.Name} Leaderboard")
+            .WithColor(Color.Gold)
+            .WithThumbnailUrl(Context.Guild.IconUrl)
+            .WithCurrentTimestamp();
+
+        int pos = 1;
+        var description = "";
+        foreach (var user in topUsers)
+        {
+            var discordUser = await Context.Client.GetUserAsync(ulong.Parse(user.UserId));
+            var name = discordUser?.Username ?? "Unknown User";
+            description += $"**{pos}. {name}** — Level {user.Level} ({user.Xp:N0} XP)\n";
+            pos++;
+        }
+
+        if (string.IsNullOrEmpty(description)) description = "No users found on the leaderboard.";
+        embed.WithDescription(description);
+
+        await FollowupAsync(embed: embed.Build());
     }
 }

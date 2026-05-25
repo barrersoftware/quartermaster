@@ -7,7 +7,7 @@ using Quartermaster.Core.Models;
 
 namespace Quartermaster.Bot.Modules;
 
-public class EconomyModule : InteractionModuleBase<SocketInteractionContext>
+public partial class EconomyModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly IDatabaseService _db;
 

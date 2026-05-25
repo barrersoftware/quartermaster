@@ -16,6 +16,8 @@ public interface IDatabaseService
     Task<IEnumerable<CustomCommand>> GetCustomCommandsAsync(string guildId);
     Task AddCustomCommandAsync(CustomCommand command);
     Task DeleteCustomCommandAsync(string guildId, string commandName);
+    Task<int> GetUserRankAsync(string userId, string guildId);
+    Task<IEnumerable<User>> GetLeaderboardAsync(string guildId, int limit);
     
     // Auto-Mod
     Task<AutomodSetting> GetAutomodSettingsOrDefaultAsync(string guildId);
@@ -105,12 +107,32 @@ public class SqliteDatabaseService : IDatabaseService
             INSERT INTO users (user_id, guild_id, xp, level, last_message, gold, last_daily)
             VALUES (@UserId, @GuildId, @Xp, @Level, @LastMessage, @Gold, @LastDaily)
             ON CONFLICT(user_id, guild_id) DO UPDATE SET
-                xp = @Xp,
-                level = @Level,
-                last_message = @LastMessage,
-                gold = @Gold,
-                last_daily = @LastDaily",
+                xp = MAX(users.xp, EXCLUDED.xp),
+                level = MAX(users.level, EXCLUDED.level),
+                last_message = MAX(users.last_message, EXCLUDED.last_message),
+                gold = CASE WHEN users.gold > 0 THEN users.gold ELSE EXCLUDED.gold END,
+                last_daily = CASE WHEN users.last_daily > 0 THEN users.last_daily ELSE EXCLUDED.last_daily END",
             user);
+    }
+
+    public async Task<int> GetUserRankAsync(string userId, string guildId)
+    {
+        using var db = GetConnection();
+        var user = await GetUserAsync(userId, guildId);
+        if (user == null) return 0;
+
+        return await db.ExecuteScalarAsync<int>(@"
+            SELECT COUNT(*) + 1 FROM users 
+            WHERE guild_id = @guildId AND (level > @Level OR (level = @Level AND xp > @Xp))",
+            new { guildId, user.Level, user.Xp });
+    }
+
+    public async Task<IEnumerable<User>> GetLeaderboardAsync(string guildId, int limit)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<User>(
+            "SELECT * FROM users WHERE guild_id = @guildId ORDER BY level DESC, xp DESC LIMIT @limit",
+            new { guildId, limit });
     }
 
     public async Task<GuildSetting> GetGuildSettingsOrDefaultAsync(string guildId)
