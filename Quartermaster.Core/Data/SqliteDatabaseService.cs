@@ -52,6 +52,19 @@ public interface IDatabaseService
     Task UpdateStarboardSettingsAsync(StarboardSetting settings);
     Task<string?> GetStarboardMessageIdAsync(string originalMessageId);
     Task AddStarboardMessageAsync(string guildId, string originalMessageId, string starboardMessageId);
+
+    // Reaction Roles
+    Task<IEnumerable<ReactionRole>> GetReactionRolesAsync(string guildId);
+    Task AddReactionRoleAsync(ReactionRole rr);
+    Task DeleteReactionRoleAsync(string guildId, string messageId, string emoji);
+
+    // Social Alerts
+    Task<IEnumerable<SocialAlert>> GetSocialAlertsAsync(string guildId);
+    Task<IEnumerable<SocialAlert>> GetAllSocialAlertsAsync();
+    Task AddSocialAlertAsync(SocialAlert alert);
+    Task DeleteSocialAlertAsync(string guildId, string platform, string channelName);
+    Task UpdateSocialAlertLastNotifiedAsync(int id, string notifiedId);
+
     Task InitializeDatabaseAsync();
 }
 
@@ -359,6 +372,64 @@ public class SqliteDatabaseService : IDatabaseService
         using var db = GetConnection();
         await db.ExecuteAsync("INSERT INTO starboard_messages (guild_id, original_message_id, starboard_message_id) VALUES (@guildId, @originalMessageId, @starboardMessageId)", 
             new { guildId, originalMessageId, starboardMessageId });
+    }
+
+    // Reaction Roles
+    public async Task<IEnumerable<ReactionRole>> GetReactionRolesAsync(string guildId)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<ReactionRole>("SELECT * FROM reaction_roles WHERE guild_id = @guildId", new { guildId });
+    }
+
+    public async Task AddReactionRoleAsync(ReactionRole rr)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(@"
+            INSERT INTO reaction_roles (guild_id, message_id, emoji, role_id)
+            VALUES (@GuildId, @MessageId, @Emoji, @RoleId)
+            ON CONFLICT(guild_id, message_id, emoji) DO UPDATE SET role_id = @RoleId",
+            rr);
+    }
+
+    public async Task DeleteReactionRoleAsync(string guildId, string messageId, string emoji)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync("DELETE FROM reaction_roles WHERE guild_id = @guildId AND message_id = @messageId AND emoji = @emoji", new { guildId, messageId, emoji });
+    }
+
+    // Social Alerts
+    public async Task<IEnumerable<SocialAlert>> GetSocialAlertsAsync(string guildId)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<SocialAlert>("SELECT * FROM social_alerts WHERE guild_id = @guildId", new { guildId });
+    }
+
+    public async Task<IEnumerable<SocialAlert>> GetAllSocialAlertsAsync()
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<SocialAlert>("SELECT * FROM social_alerts");
+    }
+
+    public async Task AddSocialAlertAsync(SocialAlert alert)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(@"
+            INSERT INTO social_alerts (guild_id, platform, channel_name, alert_channel_id)
+            VALUES (@GuildId, @Platform, @ChannelName, @AlertChannelId)
+            ON CONFLICT(guild_id, platform, channel_name) DO UPDATE SET alert_channel_id = @AlertChannelId",
+            alert);
+    }
+
+    public async Task DeleteSocialAlertAsync(string guildId, string platform, string channelName)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync("DELETE FROM social_alerts WHERE guild_id = @guildId AND platform = @platform AND channel_name = @channelName", new { guildId, platform, channelName });
+    }
+
+    public async Task UpdateSocialAlertLastNotifiedAsync(int id, string notifiedId)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync("UPDATE social_alerts SET last_notified_id = @notifiedId WHERE id = @id", new { id, notifiedId });
     }
 
     public async Task InitializeDatabaseAsync()

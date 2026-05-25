@@ -1,0 +1,107 @@
+@model IEnumerable<Quartermaster.Core.Models.ShopItem>
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    ViewData["Title"] = "Economy & Shop - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Economy & Shop</span>
+        </div>
+
+        <h1>Ship's Stores (Economy & Shop)</h1>
+        <p>Manage the server currency and items members can buy with Pirate Gold.</p>
+
+        <div class="settings-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+            <!-- 1. Shop Inventory -->
+            <div class="settings-section">
+                <h2>Shop Inventory</h2>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan="3" class="muted">The shop is currently empty.</td></tr>
+                        }
+                        else
+                        {
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td><strong>@item.Name</strong><br/><small class="muted">@item.Description</small></td>
+                                    <td><strong style="color: #FFD700;">💰 @item.Price.ToString("N0")</strong></td>
+                                    <td>
+                                        <button class="btn btn-small btn-danger" onclick="deleteItem(@item.Id)">Remove</button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 2. Add Item -->
+            <div class="settings-section">
+                <h2>Stock the Store</h2>
+                <p>Create new items for members to purchase.</p>
+                <div class="add-box" style="padding: 20px; background: rgba(0,0,0,0.1); border-radius: 8px; margin-top: 15px;">
+                    <form id="addItemForm">
+                        <div class="form-group">
+                            <label>Item Name</label>
+                            <input type="text" name="name" class="input-field" placeholder="e.g. VIP Member" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" name="description" class="input-field" placeholder="What does this item do?">
+                        </div>
+                        <div class="form-group">
+                            <label>Price (Pirate Gold)</label>
+                            <input type="number" name="price" class="input-field" value="1000" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Role to Award (Role ID)</label>
+                            <input type="text" name="role_id" class="input-field" placeholder="Optional Role ID">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">Add to Shop</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            const response = await fetch(`/api/server/${guildId}/economy/shop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) location.reload();
+        });
+
+        async function deleteItem(id) {
+            if (!confirm('Remove this item from the shop?')) return;
+            const response = await fetch(`/api/server/${guildId}/economy/shop/${id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) location.reload();
+        }
+    </script>
+}

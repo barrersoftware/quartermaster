@@ -1,0 +1,79 @@
+@model Quartermaster.Core.Models.GuildSetting
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var channels = ViewBag.Channels as IEnumerable<dynamic> ?? new List<dynamic>();
+    var roles = ViewBag.Roles as IEnumerable<dynamic> ?? new List<dynamic>();
+    // Simplified: Getting welcome settings from Model (GuildSetting)
+    ViewData["Title"] = "Welcome - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Welcome & Leave</span>
+        </div>
+
+        <h1>Welcome & Leave Messages</h1>
+        <p>Configure automated messages and roles for new and departing members.</p>
+
+        <form id="welcomeForm">
+            <!-- 1. Welcome Settings -->
+            <div class="settings-section">
+                <h2>Welcome Configuration</h2>
+
+                <div class="form-group">
+                    <label>Auto-Role (Join Role)</label>
+                    <select name="auto_role" class="input-select">
+                        <option value="">None (Disabled)</option>
+                        @foreach (var role in roles)
+                        {
+                            <option value="@role.id" selected="@(Model.AutoRole == role.id)">
+                                @@@role.name
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Welcome Channel</label>
+                    <select name="welcomeChannel" class="input-select">
+                        @foreach (var channel in channels)
+                        {
+                            <option value="@channel.name" selected="@(Model.WelcomeChannel == channel.name)">
+                                #@channel.name
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Custom Welcome Card Background (URL)</label>
+                    <input type="text" name="welcome_background" value="@Model.WelcomeBackground" class="input-field" placeholder="https://example.com/welcome-bg.png">
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <button type="submit" class="btn btn-primary btn-large">Save Welcome Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('welcomeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/welcome`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            if (response.ok) alert('Settings saved!');
+        });
+    </script>
+}

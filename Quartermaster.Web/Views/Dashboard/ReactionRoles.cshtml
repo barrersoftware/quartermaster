@@ -1,0 +1,110 @@
+@model IEnumerable<Quartermaster.Core.Models.ReactionRole>
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var roles = ViewBag.Roles as IEnumerable<dynamic> ?? new List<dynamic>();
+    ViewData["Title"] = "Reaction Roles - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Reaction Roles</span>
+        </div>
+
+        <h1>🎭 Reaction Roles</h1>
+        <p>Assign roles to members automatically when they react to specific messages.</p>
+
+        <div class="settings-section">
+            <h2>Active Reaction Roles</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Message ID</th>
+                        <th>Emoji</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr><td colspan="4" class="muted">No reaction roles configured.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var rr in Model)
+                        {
+                            var role = roles.FirstOrDefault(r => r.id == rr.RoleId);
+                            <tr>
+                                <td><code>@rr.MessageId</code></td>
+                                <td style="font-size:1.2rem;">@rr.Emoji</td>
+                                <td>
+                                    <span class="role-badge" style="background-color: @(role != null ? role.hexColor : "#99AAB5")">
+                                        @@@(role?.name ?? rr.RoleId)
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-small btn-danger" onclick="deleteReactionRole('@rr.MessageId', '@rr.Emoji')">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <div class="add-box" style="margin-top: 2rem; padding: 25px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                <h3>Create New Reaction Role</h3>
+                <form id="addReactionRoleForm" class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Message ID</label>
+                        <input type="text" name="message_id" class="input-field" placeholder="Right click message -> Copy ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Emoji</label>
+                        <input type="text" name="emoji" class="input-field" placeholder="e.g. ✅" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role to Award</label>
+                        <select name="role_id" class="input-select" required>
+                            <option value="">Select a role...</option>
+                            @foreach (var role in roles)
+                            {
+                                <option value="@role.id">@@@role.name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:flex-end;">
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('addReactionRoleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/reaction-roles`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            if (response.ok) location.reload();
+        });
+
+        async function deleteReactionRole(messageId, emoji) {
+            if (!confirm(`Delete this reaction role mapping?`)) return;
+            const response = await fetch(`/api/server/${guildId}/reaction-roles/${messageId}/${encodeURIComponent(emoji)}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) location.reload();
+        }
+    </script>
+}

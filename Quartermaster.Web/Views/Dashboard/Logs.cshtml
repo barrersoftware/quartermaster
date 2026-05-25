@@ -1,0 +1,59 @@
+@model IEnumerable<Quartermaster.Core.Models.AuditLog>
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    ViewData["Title"] = "Audit Logs - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Audit Logs</span>
+        </div>
+
+        <h1>📑 Web Audit Log Viewer</h1>
+        <p>A searchable history of all server events and moderator actions recorded by Quartermaster.</p>
+
+        <div class="settings-section">
+            <div class="logs-table-wrapper" style="overflow-x: auto;">
+                <table class="table logs-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Type</th>
+                            <th>User ID</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center">No logs found in the database.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var log in Model)
+                            {
+                                var typeClass = log.Type.StartsWith("MOD_") ? "badge-danger" : 
+                                               log.Type.StartsWith("MSG_") ? "badge-info" : "badge-secondary";
+                                <tr>
+                                    <td class="log-time" style="white-space:nowrap;">@DateTimeOffset.FromUnixTimeSeconds(log.Timestamp).LocalDateTime.ToString("g")</td>
+                                    <td><span class="badge @typeClass">@log.Type</span></td>
+                                    <td><code>@log.UserId</code></td>
+                                    <td class="log-details">
+                                        <div class="log-content-preview" style="max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            @log.Content
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

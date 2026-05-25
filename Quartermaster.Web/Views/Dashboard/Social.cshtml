@@ -1,0 +1,111 @@
+@model IEnumerable<Quartermaster.Core.Models.SocialAlert>
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var channels = ViewBag.Channels as IEnumerable<dynamic> ?? new List<dynamic>();
+    ViewData["Title"] = "Social Alerts - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Social Alerts</span>
+        </div>
+
+        <h1>Social Media Alerts</h1>
+        <p>Automatically announce when you go live on Twitch or post to YouTube.</p>
+
+        <div class="settings-section">
+            <h2>Active Alerts</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>Channel Name</th>
+                        <th>Target Discord Channel</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr><td colspan="4" class="muted">No alerts configured.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var alert in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="badge @(alert.Platform == "twitch" ? "badge-info" : "badge-danger")">
+                                        @alert.Platform.ToUpper()
+                                    </span>
+                                </td>
+                                <td><code>@alert.ChannelName</code></td>
+                                <td>#@(channels.FirstOrDefault(c => c.id == alert.AlertChannelId)?.name ?? alert.AlertChannelId)</td>
+                                <td>
+                                    <button class="btn btn-small btn-danger" onclick="deleteAlert('@alert.Platform', '@alert.ChannelName')">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <div class="add-box" style="margin-top: 2rem; padding: 25px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                <h3>Add New Alert</h3>
+                <form id="addAlertForm" class="form-row" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Platform</label>
+                        <select name="platform" class="input-select" required>
+                            <option value="twitch">Twitch</option>
+                            <option value="youtube">YouTube</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Channel Name / ID</label>
+                        <input type="text" name="channel" class="input-field" placeholder="e.g. g4turbo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Discord Alert Channel</label>
+                        <select name="alert_channel_id" class="input-select" required>
+                            @foreach (var ch in channels)
+                            {
+                                <option value="@ch.id">#@ch.name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:flex-end;">
+                        <button type="submit" class="btn btn-primary">Add Alert</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch(`/api/server/${guildId}/social`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+            });
+            if (response.ok) location.reload();
+        });
+
+        async function deleteAlert(platform, channel) {
+            if (!confirm(`Delete ${platform} alert for "${channel}"?`)) return;
+            const response = await fetch(`/api/server/${guildId}/social/${platform}/${encodeURIComponent(channel)}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) location.reload();
+        }
+    </script>
+}

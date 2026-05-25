@@ -1,0 +1,188 @@
+@model Quartermaster.Core.Models.AutomodSetting
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var blacklist = ViewBag.Blacklist as IEnumerable<string> ?? new List<string>();
+    var warnings = ViewBag.Warnings as IEnumerable<Quartermaster.Core.Models.Warning> ?? new List<Quartermaster.Core.Models.Warning>();
+    ViewData["Title"] = "Moderation - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Moderation</span>
+        </div>
+
+        <h1>Moderation & Auto-Mod</h1>
+        <p>Maintain server order with automated protections and a searchable warning history.</p>
+
+        <div class="settings-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+            <!-- 1. Auto-Moderation Toggles -->
+            <div class="settings-section">
+                <h2>Auto-Moderation</h2>
+                <form id="automodForm">
+                    <div class="setting-item">
+                        <label>General Spam Protection</label>
+                        <select name="SpamEnabled" class="input-select">
+                            <!-— Fixed RZ1031 by moving C# logic outside of option tag attributes where possible or using strings -->
+                            <option value="1" selected="@(Model.SpamEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.SpamEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Spam Threshold (messages/5s)</label>
+                        <input type="number" name="SpamThreshold" value="@Model.SpamThreshold" class="input-field">
+                    </div>
+                    <div class="setting-item">
+                        <label>Link Filtering</label>
+                        <select name="LinksEnabled" class="input-select">
+                            <option value="1" selected="@(Model.LinksEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.LinksEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Invite Filtering</label>
+                        <select name="InvitesEnabled" class="input-select">
+                            <option value="1" selected="@(Model.InvitesEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.InvitesEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Bad Words Filter</label>
+                        <select name="BadwordsEnabled" class="input-select">
+                            <option value="1" selected="@(Model.BadwordsEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.BadwordsEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <label>Emoji Spam Protection</label>
+                        <select name="EmojiSpamEnabled" class="input-select">
+                            <option value="1" selected="@(Model.EmojiSpamEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.EmojiSpamEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Emoji Threshold</label>
+                        <input type="number" name="EmojiThreshold" value="@Model.EmojiThreshold" class="input-field">
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Caps Spam Protection</label>
+                        <select name="CapsSpamEnabled" class="input-select">
+                            <option value="1" selected="@(Model.CapsSpamEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.CapsSpamEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Caps Threshold (%)</label>
+                        <input type="number" name="CapsThreshold" value="@Model.CapsThreshold" class="input-field" min="1" max="100">
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Mention Spam Protection</label>
+                        <select name="MentionSpamEnabled" class="input-select">
+                            <option value="1" selected="@(Model.MentionSpamEnabled == 1)">Enabled</option>
+                            <option value="0" selected="@(Model.MentionSpamEnabled == 0)">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Mention Threshold</label>
+                        <input type="number" name="MentionThreshold" value="@Model.MentionThreshold" class="input-field">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large" style="width: 100%; margin-top: 1rem;">Save Protections</button>
+                </form>
+            </div>
+
+            <!-- 2. Word Blacklist -->
+            <div class="settings-section">
+                <h2>Forbidden Words</h2>
+                <p>Messages containing these words will be deleted if filter is enabled.</p>
+                <div class="add-box" style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="new-word" placeholder="Add word to block..." class="input-field">
+                        <button id="add-word-btn" class="btn btn-secondary">Add</button>
+                    </div>
+                </div>
+                <div class="word-list" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    @foreach (var word in blacklist)
+                    {
+                        <span class="word-tag" style="background: var(--bg-tertiary); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                            <code>@word</code>
+                            <button onclick="removeWord('@word')" style="background: none; border: none; color: var(--danger-color); cursor: pointer; font-size: 1.2rem;">&times;</button>
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Warning History -->
+        <div class="settings-section" style="margin-top: 2rem;">
+            <h2>Recent Warning History</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Reason</th>
+                        <th>Moderator</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var warning in warnings)
+                    {
+                        <tr>
+                            <td><code>@warning.UserId</code></td>
+                            <td>@warning.Reason</td>
+                            <td><code>@warning.ModeratorId</code></td>
+                            <td class="muted">@DateTimeOffset.FromUnixTimeSeconds(warning.Timestamp).LocalDateTime.ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('automodForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            const response = await fetch(`/api/server/${guildId}/automod`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            alert(result.success ? 'Auto-mod settings saved!' : 'Error: ' + result.error);
+        });
+
+        document.getElementById('add-word-btn').addEventListener('click', async () => {
+            const wordInput = document.getElementById('new-word');
+            const word = wordInput.value.trim();
+            if (!word) return;
+
+            const response = await fetch(`/api/server/${guildId}/automod/blacklist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word })
+            });
+            if (response.ok) location.reload();
+        });
+
+        async function removeWord(word) {
+            if (!confirm(`Remove "${word}" from the blacklist?`)) return;
+            const response = await fetch(`/api/server/${guildId}/automod/blacklist/${encodeURIComponent(word)}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) location.reload();
+        }
+    </script>
+}

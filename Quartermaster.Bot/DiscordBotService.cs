@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Linq;
 
 namespace Quartermaster.Bot;
 
@@ -57,16 +58,11 @@ public class DiscordBotService : BackgroundService
             await _interactions.RegisterCommandsGloballyAsync();
         };
 
-        // Wire up the Message Received event (Auto-Mod, Leveling, Prefix Commands)
+        // Wire up events
         _client.MessageReceived += HandleMessageAsync;
-        
-        // Wire up the Interaction Created event (Slash Commands)
         _client.InteractionCreated += HandleInteractionAsync;
-
-        // Wire up ReactionAdded for Starboard
         _client.ReactionAdded += HandleReactionAddedAsync;
-
-        // Wire up UserJoined for Welcome Messages and Auto-Role
+        _client.ReactionRemoved += HandleReactionRemovedAsync;
         _client.UserJoined += HandleUserJoinedAsync;
 
         try
@@ -130,11 +126,19 @@ public class DiscordBotService : BackgroundService
         var leveling = scope.ServiceProvider.GetRequiredService<Core.Services.LevelingService>();
         // Award 15-25 XP
         var xpAmount = new Random().Next(15, 26);
-        var result = await leveling.AddXpAsync(message.Author.Id.ToString(), ((SocketGuildChannel)message.Channel).Guild.Id.ToString(), xpAmount);
+        var guild = ((SocketGuildChannel)message.Channel).Guild;
+        var result = await leveling.AddXpAsync(message.Author.Id.ToString(), guild.Id.ToString(), xpAmount);
 
         if (result.LeveledUp)
         {
-            await message.Channel.SendMessageAsync($"Congratulations {message.Author.Mention}, you just advanced to level {result.NewLevel}!");
+            var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
+            var settings = await db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
+            
+            var targetChannel = settings.LevelUpChannel != null 
+                ? (guild.GetTextChannel(ulong.Parse(settings.LevelUpChannel)) ?? (IMessageChannel)message.Channel)
+                : message.Channel;
+
+            await targetChannel.SendMessageAsync($"Congratulations {message.Author.Mention}, you just advanced to level {result.NewLevel}!");
         }
         
         var argPos = 0;
@@ -165,10 +169,48 @@ public class DiscordBotService : BackgroundService
     private async Task HandleReactionAddedAsync(Cacheable<IUserMessage, ulong> cachedMessage, Cacheable<IMessageChannel, ulong> cachedChannel, SocketReaction reaction)
     {
         using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
+        
+        // 1. Starboard
         var starboard = scope.ServiceProvider.GetRequiredService<Core.Services.StarboardService>();
         await starboard.HandleReactionAsync(cachedMessage, cachedChannel, reaction);
         
-        // --- This is where we would also call ReactionRolesService ---
+        // 2. Reaction Roles
+        if (reaction.User.Value is not IGuildUser user || user.IsBot) return;
+        
+        var guildId = user.Guild.Id.ToString();
+        var reactionRoles = await db.GetReactionRolesAsync(guildId);
+        
+        var match = reactionRoles.FirstOrDefault(rr => 
+            rr.MessageId == reaction.MessageId.ToString() && 
+            rr.Emoji == reaction.Emote.Name);
+
+        if (match != null)
+        {
+            var role = user.Guild.GetRole(ulong.Parse(match.RoleId));
+            if (role != null) await user.AddRoleAsync(role);
+        }
+    }
+
+    private async Task HandleReactionRemovedAsync(Cacheable<IUserMessage, ulong> cachedMessage, Cacheable<IMessageChannel, ulong> cachedChannel, SocketReaction reaction)
+    {
+        if (!reaction.User.IsSpecified || reaction.User.Value is not IGuildUser user || user.IsBot) return;
+
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
+
+        var guildId = user.Guild.Id.ToString();
+        var reactionRoles = await db.GetReactionRolesAsync(guildId);
+
+        var match = reactionRoles.FirstOrDefault(rr => 
+            rr.MessageId == reaction.MessageId.ToString() && 
+            rr.Emoji == reaction.Emote.Name);
+
+        if (match != null)
+        {
+            var role = user.Guild.GetRole(ulong.Parse(match.RoleId));
+            if (role != null) await user.RemoveRoleAsync(role);
+        }
     }
 
     private async Task HandleUserJoinedAsync(SocketGuildUser user)

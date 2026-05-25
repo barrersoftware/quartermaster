@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Quartermaster.Core.Data;
 using Quartermaster.Core.Models;
+using System.Text.Json;
 
 namespace Quartermaster.Web.Controllers;
 
@@ -17,16 +18,19 @@ public class ServerApiController : ControllerBase
         _db = db;
     }
 
+    private async Task SaveSettings(string guildId, GuildSetting s)
+    {
+        await _db.UpdateGuildSettingsAsync(s);
+    }
+
     [HttpPost("settings/visuals")]
     public async Task<IActionResult> UpdateVisuals(string guildId, [FromBody] VisualUpdateModel model)
     {
         var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
-        
         if (!string.IsNullOrEmpty(model.RankCardColor)) settings.RankCardColor = model.RankCardColor;
         settings.RankBackground = model.RankBackground;
         settings.WelcomeBackground = model.WelcomeBackground;
-
-        await _db.UpdateGuildSettingsAsync(settings);
+        await SaveSettings(guildId, settings);
         return Ok(new { success = true });
     }
 
@@ -38,7 +42,138 @@ public class ServerApiController : ControllerBase
         return Ok(new { success = true });
     }
 
-    // Models for API
+    [HttpPost("automod/blacklist")]
+    public async Task<IActionResult> AddBlacklist(string guildId, [FromBody] JsonElement body)
+    {
+        var word = body.GetProperty("word").GetString();
+        if (string.IsNullOrEmpty(word)) return BadRequest();
+        await _db.AddBlacklistWordAsync(guildId, word);
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("automod/blacklist/{word}")]
+    public async Task<IActionResult> RemoveBlacklist(string guildId, string word)
+    {
+        await _db.RemoveBlacklistWordAsync(guildId, word);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("raid")]
+    public async Task<IActionResult> UpdateRaid(string guildId, [FromBody] RaidSetting model)
+    {
+        model.GuildId = guildId;
+        await _db.UpdateRaidSettingsAsync(model);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("welcome")]
+    public async Task<IActionResult> UpdateWelcome(string guildId, [FromBody] JsonElement body)
+    {
+        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+        
+        // Manual mapping from JS-style form data
+        if (body.TryGetProperty("welcomeChannel", out var wc)) settings.WelcomeChannel = wc.GetString();
+        if (body.TryGetProperty("auto_role", out var ar)) settings.AutoRole = ar.GetString();
+        if (body.TryGetProperty("welcome_background", out var wb)) settings.WelcomeBackground = wb.GetString();
+
+        // Note: JS version also updated config.json, we should move everything to DB for C#
+        await SaveSettings(guildId, settings);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("permissions/mod-roles")]
+    public async Task<IActionResult> AddModRole(string guildId, [FromBody] JsonElement body)
+    {
+        var roleId = body.GetProperty("roleId").GetString();
+        if (string.IsNullOrEmpty(roleId)) return BadRequest();
+
+        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+        var roles = string.IsNullOrEmpty(settings.ModRoles) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(settings.ModRoles);
+        
+        if (roles != null && !roles.Contains(roleId))
+        {
+            roles.Add(roleId);
+            settings.ModRoles = JsonSerializer.Serialize(roles);
+            await SaveSettings(guildId, settings);
+        }
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("permissions/mod-roles/{roleId}")]
+    public async Task<IActionResult> RemoveModRole(string guildId, string roleId)
+    {
+        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+        var roles = string.IsNullOrEmpty(settings.ModRoles) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(settings.ModRoles);
+        
+        if (roles != null)
+        {
+            roles.Remove(roleId);
+            settings.ModRoles = JsonSerializer.Serialize(roles);
+            await SaveSettings(guildId, settings);
+        }
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("triggers")]
+    public async Task<IActionResult> AddTrigger(string guildId, [FromBody] AdvancedTrigger model)
+    {
+        model.GuildId = guildId;
+        await _db.AddTriggerAsync(model);
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("triggers/{phrase}")]
+    public async Task<IActionResult> RemoveTrigger(string guildId, string phrase)
+    {
+        await _db.DeleteTriggerAsync(guildId, phrase);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("social")]
+    public async Task<IActionResult> AddSocial(string guildId, [FromBody] SocialAlert model)
+    {
+        model.GuildId = guildId;
+        await _db.AddSocialAlertAsync(model);
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("social/{platform}/{channel}")]
+    public async Task<IActionResult> RemoveSocial(string guildId, string platform, string channel)
+    {
+        await _db.DeleteSocialAlertAsync(guildId, platform, channel);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("economy/shop")]
+    public async Task<IActionResult> AddShopItem(string guildId, [FromBody] ShopItem model)
+    {
+        model.GuildId = guildId;
+        await _db.AddShopItemAsync(model);
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("economy/shop/{id}")]
+    public async Task<IActionResult> RemoveShopItem(string guildId, int id)
+    {
+        await _db.DeleteShopItemAsync(guildId, id);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("reaction-roles")]
+    public async Task<IActionResult> AddReactionRole(string guildId, [FromBody] ReactionRole model)
+    {
+        model.GuildId = guildId;
+        await _db.AddReactionRoleAsync(model);
+        return Ok(new { success = true });
+    }
+
+    [HttpDelete("reaction-roles/{messageId}/{emoji}")]
+    public async Task<IActionResult> RemoveReactionRole(string guildId, string messageId, string emoji)
+    {
+        await _db.DeleteReactionRoleAsync(guildId, messageId, emoji);
+        return Ok(new { success = true });
+    }
+
     public class VisualUpdateModel
     {
         public string? RankCardColor { get; set; }

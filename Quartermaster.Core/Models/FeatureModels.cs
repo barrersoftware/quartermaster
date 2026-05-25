@@ -79,3 +79,22 @@ public class StarboardSetting
     public string Emoji { get; set; } = "⭐";
     public int Threshold { get; set; } = 3;
 }
+
+public class ReactionRole
+{
+    public int Id { get; set; }
+    public string GuildId { get; set; } = string.Empty;
+    public string MessageId { get; set; } = string.Empty;
+    public string Emoji { get; set; } = string.Empty;
+    public string RoleId { get; set; } = string.Empty;
+}
+
+public class SocialAlert
+{
+    public int Id { get; set; }
+    public string GuildId { get; set; } = string.Empty;
+    public string Platform { get; set; } = string.Empty; // 'twitch' or 'youtube'
+    public string ChannelName { get; set; } = string.Empty;
+    public string AlertChannelId { get; set; } = string.Empty;
+    public string? LastNotifiedId { get; set; }
+}
