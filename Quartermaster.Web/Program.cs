@@ -12,7 +12,6 @@ builder.Host.UseWindowsService(options => options.ServiceName = "QuartermasterWe
 builder.Host.UseSystemd();
 
 // Robust configuration loading
-// ... (previous logic preserved)
 string configName = "appsettings.json";
 string configPath = "";
 
@@ -38,11 +37,11 @@ var dbService = new SqliteDatabaseService(dbPath);
 await dbService.InitializeDatabaseAsync();
 builder.Services.AddSingleton<IDatabaseService>(dbService);
 
-// 1. Forwarded Headers (Essential for Reverse Proxies like Nginx/Caddy)
+// 1. Forwarded Headers (Essential for Reverse Proxies)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 
@@ -63,6 +62,7 @@ builder.Services.AddAuthentication(options =>
 {
     options.LoginPath = "/login";
     options.LogoutPath = "/logout";
+    options.Cookie.Name = "Quartermaster.Auth";
     options.Cookie.SameSite = SameSiteMode.Lax;
 })
 .AddDiscord(options =>
@@ -70,19 +70,39 @@ builder.Services.AddAuthentication(options =>
     options.ClientId = builder.Configuration["Discord:ClientId"] ?? "";
     options.ClientSecret = builder.Configuration["Discord:ClientSecret"] ?? "";
     
-    // Explicitly set correlation cookie settings
-    options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-    options.CorrelationCookie.HttpOnly = true;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-
+    options.CallbackPath = new PathString("/callback");
     options.SaveTokens = true;
     options.Scope.Add("guilds");
     options.Scope.Add("identify");
+
+    // Force the redirect URI to match the one in Discord if DashboardUrl is configured
+    options.Events.OnRedirectToAuthorizationEndpoint = context =>
+    {
+        var dashboardUrl = builder.Configuration["Discord:DashboardUrl"];
+        if (!string.IsNullOrEmpty(dashboardUrl))
+        {
+            var redirectUri = $"{dashboardUrl.TrimEnd('/')}/callback";
+            
+            // Re-construct the redirect URL to ensure it matches the Discord Dev Portal EXACTLY
+            var uri = new Uri(context.RedirectUri);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+            var items = query.ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
+            
+            items["redirect_uri"] = redirectUri;
+            
+            var newUrl = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("https://discord.com/api/oauth2/authorize", items);
+            context.Response.Redirect(newUrl);
+        }
+        else
+        {
+            context.Response.Redirect(context.RedirectUri);
+        }
+        return Task.CompletedTask;
+    };
 });
 
 var app = builder.Build();
 
-// Use Forwarded Headers first
 app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
@@ -92,7 +112,7 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStaticFiles();
 
-app.UseCookiePolicy(); // Fix correlation cookie
+app.UseCookiePolicy();
 app.UseRouting();
 
 app.UseAuthentication();
