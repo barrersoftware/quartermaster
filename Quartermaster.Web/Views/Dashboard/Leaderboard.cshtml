@@ -1,0 +1,51 @@
+@model IEnumerable<Quartermaster.Core.Models.User>
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var rows = Model.ToList();
+    ViewData["Title"] = "Leaderboard - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Leaderboard</span>
+        </div>
+
+        <h1>🏆 Leaderboard</h1>
+        <p>The top 25 members by level and XP for this server.</p>
+
+        <div class="settings-section">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Username</th>
+                        <th>Level</th>
+                        <th>XP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!rows.Any())
+                    {
+                        <tr><td colspan="4" class="muted">No leaderboard data found yet.</td></tr>
+                    }
+                    else
+                    {
+                        for (var i = 0; i < rows.Count; i++)
+                        {
+                            var user = rows[i];
+                            <tr>
+                                <td><strong>#@(i + 1)</strong></td>
+                                <td><code>@user.UserId</code></td>
+                                <td>@user.Level</td>
+                                <td>@user.Xp.ToString("N0")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

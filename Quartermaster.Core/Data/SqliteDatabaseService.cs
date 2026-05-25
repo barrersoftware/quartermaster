@@ -18,7 +18,17 @@ public interface IDatabaseService
     Task DeleteCustomCommandAsync(string guildId, string commandName);
     Task<int> GetUserRankAsync(string userId, string guildId);
     Task<IEnumerable<User>> GetLeaderboardAsync(string guildId, int limit);
-    
+
+    // Warnings
+    Task<IEnumerable<Warning>> GetWarningsAsync(string guildId, string? userId = null);
+    Task AddWarningAsync(Warning warning);
+    Task ClearWarningsAsync(string guildId, string userId);
+
+    // Role Rewards
+    Task<IEnumerable<RoleReward>> GetRoleRewardsAsync(string guildId);
+    Task AddRoleRewardAsync(RoleReward rr);
+    Task DeleteRoleRewardAsync(string guildId, int level);
+
     // Auto-Mod
     Task<AutomodSetting> GetAutomodSettingsOrDefaultAsync(string guildId);
     Task UpdateAutomodSettingsAsync(AutomodSetting settings);
@@ -31,7 +41,8 @@ public interface IDatabaseService
     Task UpdateRaidSettingsAsync(RaidSetting settings);
     Task AddRaidIncidentAsync(string guildId, int userCount, string action, string affectedUsers);
     Task AddAuditLogAsync(string guildId, string type, string userId, string content);
-
+    Task<IEnumerable<AuditLog>> GetAuditLogsAsync(string guildId, int limit = 50);
+ 
     // Advanced Triggers
     Task<IEnumerable<AdvancedTrigger>> GetTriggersAsync(string guildId);
     Task AddTriggerAsync(AdvancedTrigger trigger);
@@ -107,11 +118,11 @@ public class SqliteDatabaseService : IDatabaseService
             INSERT INTO users (user_id, guild_id, xp, level, last_message, gold, last_daily)
             VALUES (@UserId, @GuildId, @Xp, @Level, @LastMessage, @Gold, @LastDaily)
             ON CONFLICT(user_id, guild_id) DO UPDATE SET
-                xp = MAX(users.xp, EXCLUDED.xp),
-                level = MAX(users.level, EXCLUDED.level),
-                last_message = MAX(users.last_message, EXCLUDED.last_message),
-                gold = CASE WHEN users.gold > 0 THEN users.gold ELSE EXCLUDED.gold END,
-                last_daily = CASE WHEN users.last_daily > 0 THEN users.last_daily ELSE EXCLUDED.last_daily END",
+                xp = EXCLUDED.xp,
+                level = EXCLUDED.level,
+                last_message = EXCLUDED.last_message,
+                gold = EXCLUDED.gold,
+                last_daily = EXCLUDED.last_daily",
             user);
     }
 
@@ -154,9 +165,9 @@ public class SqliteDatabaseService : IDatabaseService
         using var db = GetConnection();
         await db.ExecuteAsync(@"
             INSERT INTO guild_settings 
-            (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background, level_up_channel, leveling_enabled, level_up_message)
+            (guild_id, welcome_channel, leave_channel, log_channel, mute_role, rank_card_color, auto_role, mod_roles, rank_background, welcome_background, welcome_message, leave_message, level_up_channel, leveling_enabled, level_up_message)
             VALUES 
-            (@GuildId, @WelcomeChannel, @LeaveChannel, @LogChannel, @MuteRole, @RankCardColor, @AutoRole, @ModRoles, @RankBackground, @WelcomeBackground, @LevelUpChannel, @LevelingEnabled, @LevelUpMessage)
+            (@GuildId, @WelcomeChannel, @LeaveChannel, @LogChannel, @MuteRole, @RankCardColor, @AutoRole, @ModRoles, @RankBackground, @WelcomeBackground, @WelcomeMessage, @LeaveMessage, @LevelUpChannel, @LevelingEnabled, @LevelUpMessage)
             ON CONFLICT(guild_id) DO UPDATE SET
                 welcome_channel = @WelcomeChannel,
                 leave_channel = @LeaveChannel,
@@ -167,6 +178,8 @@ public class SqliteDatabaseService : IDatabaseService
                 mod_roles = @ModRoles,
                 rank_background = @RankBackground,
                 welcome_background = @WelcomeBackground,
+                welcome_message = @WelcomeMessage,
+                leave_message = @LeaveMessage,
                 level_up_channel = @LevelUpChannel,
                 leveling_enabled = @LevelingEnabled,
                 level_up_message = @LevelUpMessage",
@@ -179,6 +192,59 @@ public class SqliteDatabaseService : IDatabaseService
         return await db.QueryAsync<CustomCommand>(
             "SELECT * FROM custom_commands WHERE guild_id = @guildId",
             new { guildId });
+    }
+
+    public async Task<IEnumerable<Warning>> GetWarningsAsync(string guildId, string? userId = null)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<Warning>(@"
+            SELECT * FROM warnings
+            WHERE guild_id = @guildId AND (@userId IS NULL OR user_id = @userId)
+            ORDER BY timestamp DESC",
+            new { guildId, userId });
+    }
+
+    public async Task AddWarningAsync(Warning warning)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(@"
+            INSERT INTO warnings (user_id, guild_id, moderator_id, reason, timestamp)
+            VALUES (@UserId, @GuildId, @ModeratorId, @Reason, @Timestamp)",
+            warning);
+    }
+
+    public async Task ClearWarningsAsync(string guildId, string userId)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(
+            "DELETE FROM warnings WHERE guild_id = @guildId AND user_id = @userId",
+            new { guildId, userId });
+    }
+
+    public async Task<IEnumerable<RoleReward>> GetRoleRewardsAsync(string guildId)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<RoleReward>(
+            "SELECT * FROM role_rewards WHERE guild_id = @guildId ORDER BY level ASC",
+            new { guildId });
+    }
+
+    public async Task AddRoleRewardAsync(RoleReward rr)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(@"
+            INSERT INTO role_rewards (guild_id, level, role_id)
+            VALUES (@GuildId, @Level, @RoleId)
+            ON CONFLICT(guild_id, level) DO UPDATE SET role_id = @RoleId",
+            rr);
+    }
+
+    public async Task DeleteRoleRewardAsync(string guildId, int level)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(
+            "DELETE FROM role_rewards WHERE guild_id = @guildId AND level = @level",
+            new { guildId, level });
     }
 
     public async Task AddCustomCommandAsync(CustomCommand command)
@@ -278,6 +344,14 @@ public class SqliteDatabaseService : IDatabaseService
         using var db = GetConnection();
         await db.ExecuteAsync("INSERT INTO audit_logs (guild_id, type, user_id, content) VALUES (@guildId, @type, @userId, @content)", 
             new { guildId, type, userId, content });
+    }
+
+    public async Task<IEnumerable<AuditLog>> GetAuditLogsAsync(string guildId, int limit = 50)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<AuditLog>(
+            "SELECT * FROM audit_logs WHERE guild_id = @guildId ORDER BY timestamp DESC LIMIT @limit",
+            new { guildId, limit });
     }
 
     // Advanced Triggers
@@ -503,6 +577,8 @@ public class SqliteDatabaseService : IDatabaseService
                 mod_roles TEXT DEFAULT '[]',
                 rank_background TEXT,
                 welcome_background TEXT,
+                welcome_message TEXT,
+                leave_message TEXT,
                 level_up_channel TEXT,
                 leveling_enabled INTEGER DEFAULT 1,
                 level_up_message TEXT
@@ -667,5 +743,7 @@ public class SqliteDatabaseService : IDatabaseService
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN level_up_channel TEXT"); } catch { }
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN leveling_enabled INTEGER DEFAULT 1"); } catch { }
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN level_up_message TEXT"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN welcome_message TEXT"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN leave_message TEXT"); } catch { }
     }
 }

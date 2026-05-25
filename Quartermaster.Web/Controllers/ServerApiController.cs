@@ -46,6 +46,53 @@ public class ServerApiController : ControllerBase
         return Ok(new { success = true });
     }
 
+    [HttpGet("leveling/role-rewards")]
+    public async Task<IActionResult> GetRoleRewards(string guildId)
+    {
+        try
+        {
+            var rewards = await _db.GetRoleRewardsAsync(guildId);
+            return Ok(rewards);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpPost("leveling/role-rewards")]
+    public async Task<IActionResult> AddRoleReward(string guildId, [FromBody] RoleRewardRequest model)
+    {
+        try
+        {
+            await _db.AddRoleRewardAsync(new RoleReward
+            {
+                GuildId = guildId,
+                Level = model.Level,
+                RoleId = model.RoleId
+            });
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpDelete("leveling/role-rewards/{level}")]
+    public async Task<IActionResult> DeleteRoleReward(string guildId, int level)
+    {
+        try
+        {
+            await _db.DeleteRoleRewardAsync(guildId, level);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
     [HttpPost("automod")]
     public async Task<IActionResult> UpdateAutomod(string guildId, [FromBody] AutomodSetting model)
     {
@@ -70,6 +117,34 @@ public class ServerApiController : ControllerBase
         return Ok(new { success = true });
     }
 
+    [HttpGet("moderation/warnings/{userId}")]
+    public async Task<IActionResult> GetWarnings(string guildId, string userId)
+    {
+        try
+        {
+            var warnings = await _db.GetWarningsAsync(guildId, userId);
+            return Ok(warnings);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpDelete("moderation/warnings/{userId}")]
+    public async Task<IActionResult> ClearWarnings(string guildId, string userId)
+    {
+        try
+        {
+            await _db.ClearWarningsAsync(guildId, userId);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
     [HttpPost("raid")]
     public async Task<IActionResult> UpdateRaid(string guildId, [FromBody] RaidSetting model)
     {
@@ -81,16 +156,42 @@ public class ServerApiController : ControllerBase
     [HttpPost("welcome")]
     public async Task<IActionResult> UpdateWelcome(string guildId, [FromBody] JsonElement body)
     {
-        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
-        
-        // Manual mapping from JS-style form data
-        if (body.TryGetProperty("welcomeChannel", out var wc)) settings.WelcomeChannel = wc.GetString();
-        if (body.TryGetProperty("auto_role", out var ar)) settings.AutoRole = ar.GetString();
-        if (body.TryGetProperty("welcome_background", out var wb)) settings.WelcomeBackground = wb.GetString();
+        try
+        {
+            var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+            if (body.TryGetProperty("welcomeChannel", out var wc)) settings.WelcomeChannel = wc.GetString();
+            if (body.TryGetProperty("auto_role", out var ar)) settings.AutoRole = ar.GetString();
+            if (body.TryGetProperty("welcome_background", out var wb)) settings.WelcomeBackground = wb.GetString();
+            if (body.TryGetProperty("leave_channel", out var lc)) settings.LeaveChannel = lc.GetString();
+            if (body.TryGetProperty("leaveChannel", out var lc2)) settings.LeaveChannel = lc2.GetString();
+            if (body.TryGetProperty("welcome_message", out var wm)) settings.WelcomeMessage = wm.GetString();
+            if (body.TryGetProperty("welcomeMessage", out var wm2)) settings.WelcomeMessage = wm2.GetString();
+            if (body.TryGetProperty("leave_message", out var lm)) settings.LeaveMessage = lm.GetString();
+            if (body.TryGetProperty("leaveMessage", out var lm2)) settings.LeaveMessage = lm2.GetString();
+            await SaveSettings(guildId, settings);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
 
-        // Note: JS version also updated config.json, we should move everything to DB for C#
-        await SaveSettings(guildId, settings);
-        return Ok(new { success = true });
+    [HttpPost("welcome/leave")]
+    public async Task<IActionResult> UpdateLeave(string guildId, [FromBody] LeaveSettingsModel model)
+    {
+        try
+        {
+            var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+            settings.LeaveChannel = model.LeaveChannel;
+            if (model.LeaveMessage != null) settings.LeaveMessage = model.LeaveMessage;
+            await SaveSettings(guildId, settings);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
     }
 
     [HttpPost("permissions/mod-roles")]
@@ -101,7 +202,7 @@ public class ServerApiController : ControllerBase
 
         var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
         var roles = string.IsNullOrEmpty(settings.ModRoles) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(settings.ModRoles);
-        
+
         if (roles != null && !roles.Contains(roleId))
         {
             roles.Add(roleId);
@@ -116,7 +217,7 @@ public class ServerApiController : ControllerBase
     {
         var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
         var roles = string.IsNullOrEmpty(settings.ModRoles) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(settings.ModRoles);
-        
+
         if (roles != null)
         {
             roles.Remove(roleId);
@@ -139,6 +240,37 @@ public class ServerApiController : ControllerBase
     {
         await _db.DeleteTriggerAsync(guildId, phrase);
         return Ok(new { success = true });
+    }
+
+    [HttpPost("commands")]
+    public async Task<IActionResult> AddCommand(string guildId, [FromBody] CustomCommand model)
+    {
+        try
+        {
+            model.GuildId = guildId;
+            model.CommandName = model.CommandName.Trim().ToLowerInvariant();
+            if (model.CreatedAt == 0) model.CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            await _db.AddCustomCommandAsync(model);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpDelete("commands/{name}")]
+    public async Task<IActionResult> DeleteCommand(string guildId, string name)
+    {
+        try
+        {
+            await _db.DeleteCustomCommandAsync(guildId, name.ToLowerInvariant());
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
     }
 
     [HttpPost("social")]
@@ -186,6 +318,19 @@ public class ServerApiController : ControllerBase
         return Ok(new { success = true });
     }
 
+    [HttpPost("embed/send")]
+    public IActionResult SendEmbed(string guildId, [FromBody] EmbedSendModel model)
+    {
+        try
+        {
+            return Ok(new { success = false, error = "Embed sender requires bot integration - use /embed command in Discord" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
+
     public class VisualUpdateModel
     {
         public string? RankCardColor { get; set; }
@@ -198,5 +343,26 @@ public class ServerApiController : ControllerBase
         public bool Enabled { get; set; } = true;
         public string? LevelUpMessage { get; set; }
         public string? LevelUpChannel { get; set; }
+    }
+
+    public class RoleRewardRequest
+    {
+        public int Level { get; set; }
+        public string RoleId { get; set; } = string.Empty;
+    }
+
+    public class LeaveSettingsModel
+    {
+        public string? LeaveChannel { get; set; }
+        public string? LeaveMessage { get; set; }
+    }
+
+    public class EmbedSendModel
+    {
+        public string ChannelId { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Color { get; set; } = string.Empty;
+        public string? Footer { get; set; }
     }
 }

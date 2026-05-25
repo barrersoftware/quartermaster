@@ -2,6 +2,8 @@
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
     var channels = ViewBag.Channels as IEnumerable<Quartermaster.Web.Services.DiscordChannel> ?? new List<Quartermaster.Web.Services.DiscordChannel>();
+    var roles = ViewBag.Roles as IEnumerable<Quartermaster.Web.Services.DiscordRole> ?? new List<Quartermaster.Web.Services.DiscordRole>();
+    var roleRewards = ViewBag.RoleRewards as IEnumerable<Quartermaster.Core.Models.RoleReward> ?? new List<Quartermaster.Core.Models.RoleReward>();
     ViewData["Title"] = "Leveling - " + guild?.Name;
 }
 
@@ -15,7 +17,6 @@
 
         <h1>Leveling Settings</h1>
 
-        <!-- 1. General Settings -->
         <div class="settings-section">
             <h2>General Settings</h2>
             <form id="levelingForm">
@@ -30,35 +31,79 @@
                 <div class="form-group">
                     <label>Level Up Message</label>
                     <input type="text" name="levelUpMessage" value="@(Model.LevelUpMessage ?? "Congratulations {user}, you just advanced to level {level}!")" class="input-field">
-                    <small>Use {user} for mention, {level} for level number</small>
+                    <small>Use {user} for mention and {level} for the new level.</small>
                 </div>
 
                 <button type="submit" class="btn btn-primary">Save Settings</button>
             </form>
         </div>
 
-        <!-- 2. Level Up Announcements -->
         <div class="settings-section">
             <h2>Level Up Announcements</h2>
             <form id="announcementForm">
                 <div class="form-group">
                     <label>Announcement Channel</label>
                     <select name="LevelUpChannel" class="input-select">
-                        <option value="">In the channel where it happened (Current Channel)</option>
+                        <option value="">In the channel where it happened</option>
                         @foreach (var channel in channels)
                         {
-                            <option value="@channel.Id" selected="@(Model.LevelUpChannel == channel.Id)">
-                                #@channel.Name
-                            </option>
+                            var isSelected = Model.LevelUpChannel == channel.Id;
+                            <option value="@channel.Id" selected="@isSelected">#@channel.Name</option>
                         }
                     </select>
-                    <small>Choose where the bot should post level-up messages.</small>
                 </div>
                 <button type="submit" class="btn btn-primary">Save Announcement Settings</button>
             </form>
         </div>
 
-        <!-- 3. Visual Customization -->
+        <div class="settings-section">
+            <h2>Role Rewards</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Level</th>
+                        <th>Role ID</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!roleRewards.Any())
+                    {
+                        <tr><td colspan="3" class="muted">No role rewards configured yet.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var reward in roleRewards)
+                        {
+                            <tr>
+                                <td><strong>@reward.Level</strong></td>
+                                <td><code>@reward.RoleId</code></td>
+                                <td><button type="button" class="btn btn-small btn-danger" onclick="deleteRoleReward(@reward.Level)">Delete</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <form id="roleRewardForm" style="margin-top: 1rem; display:grid; grid-template-columns: 1fr 2fr auto; gap: 12px; align-items:end;">
+                <div class="form-group">
+                    <label>Level</label>
+                    <input type="number" name="level" class="input-field" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="roleId" class="input-select" required>
+                        <option value="">Select a role</option>
+                        @foreach (var role in roles)
+                        {
+                            <option value="@role.Id">@role.Name</option>
+                        }
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Reward</button>
+            </form>
+        </div>
+
         <div class="settings-section">
             <h2>Visual Customization</h2>
             <form id="visualForm">
@@ -115,6 +160,36 @@
                 alert(data.success ? 'Announcement settings saved!' : 'Error saving settings');
             } catch (err) { alert('Network error: ' + err.message); }
         });
+
+        document.getElementById('roleRewardForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/leveling/role-rewards`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        level: Number(formData.get('level')),
+                        roleId: formData.get('roleId')
+                    })
+                });
+                const data = await response.json();
+                if (data.success) location.reload();
+                else alert(data.error || 'Failed to add role reward.');
+            } catch (err) { alert('Network error: ' + err.message); }
+        });
+
+        async function deleteRoleReward(level) {
+            if (!confirm(`Delete the role reward for level ${level}?`)) return;
+            try {
+                const response = await fetch(`/api/server/${guildId}/leveling/role-rewards/${level}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (data.success) location.reload();
+                else alert(data.error || 'Failed to delete role reward.');
+            } catch (err) { alert('Network error: ' + err.message); }
+        }
 
         document.getElementById('visualForm').addEventListener('submit', async (e) => {
             e.preventDefault();

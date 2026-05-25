@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Discord;
@@ -10,12 +13,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Linq;
 
 namespace Quartermaster.Bot;
 
 public class DiscordBotService : BackgroundService
 {
+    private static readonly ConcurrentDictionary<string, Queue<DateTimeOffset>> JoinTracker = new();
+
     private readonly ILogger<DiscordBotService> _logger;
     private readonly IServiceProvider _services;
     private readonly DiscordSocketClient _client;
@@ -45,7 +49,6 @@ public class DiscordBotService : BackgroundService
         _commands.Log += LogAsync;
         _interactions.Log += LogAsync;
 
-        // Initialize services that need to hook into events
         using (var scope = _services.CreateScope())
         {
             await _commands.AddModulesAsync(Assembly.GetExecutingAssembly(), scope.ServiceProvider);
@@ -58,12 +61,12 @@ public class DiscordBotService : BackgroundService
             await _interactions.RegisterCommandsGloballyAsync();
         };
 
-        // Wire up events
         _client.MessageReceived += HandleMessageAsync;
         _client.InteractionCreated += HandleInteractionAsync;
         _client.ReactionAdded += HandleReactionAddedAsync;
         _client.ReactionRemoved += HandleReactionRemovedAsync;
         _client.UserJoined += HandleUserJoinedAsync;
+        _client.UserLeft += HandleUserLeftAsync;
 
         try
         {
@@ -109,43 +112,57 @@ public class DiscordBotService : BackgroundService
 
     private async Task HandleMessageAsync(SocketMessage rawMessage)
     {
-        if (rawMessage is not SocketUserMessage message || message.Author.IsBot) return;
+        if (rawMessage is not SocketUserMessage message || message.Author.IsBot || message.Channel is not SocketGuildChannel guildChannel) return;
 
-        // Create a scope for message-level services (DB, etc.)
         using var scope = _services.CreateScope();
-        
-        // 1. Auto-Moderation (High Priority)
+
         var automod = scope.ServiceProvider.GetRequiredService<Services.AutomodService>();
         if (await automod.IsMessageBlockedAsync(message)) return;
 
-        // 2. Advanced Triggers (Smart Responses)
         var triggers = scope.ServiceProvider.GetRequiredService<Core.Services.TriggerService>();
         if (await triggers.HandleTriggersAsync(message)) return;
 
-        // 3. Leveling & XP
         var leveling = scope.ServiceProvider.GetRequiredService<Core.Services.LevelingService>();
-        // Award 15-25 XP
-        var xpAmount = new Random().Next(15, 26);
-        var guild = ((SocketGuildChannel)message.Channel).Guild;
-        var result = await leveling.AddXpAsync(message.Author.Id.ToString(), guild.Id.ToString(), xpAmount);
+        var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
+        var guild = guildChannel.Guild;
+        var result = await leveling.AddXpAsync(message.Author.Id.ToString(), guild.Id.ToString(), Random.Shared.Next(15, 26));
 
         if (result.LeveledUp)
         {
-            var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
             var settings = await db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
-            
-            var targetChannel = settings.LevelUpChannel != null 
-                ? (guild.GetTextChannel(ulong.Parse(settings.LevelUpChannel)) ?? (IMessageChannel)message.Channel)
-                : message.Channel;
+            var targetChannel = TryGetTextChannel(guild, settings.LevelUpChannel) ?? (IMessageChannel)message.Channel;
+            var levelUpMessage = string.IsNullOrWhiteSpace(settings.LevelUpMessage)
+                ? "Congratulations {user}, you just advanced to level {level}!"
+                : settings.LevelUpMessage;
 
-            await targetChannel.SendMessageAsync($"Congratulations {message.Author.Mention}, you just advanced to level {result.NewLevel}!");
+            await targetChannel.SendMessageAsync(levelUpMessage
+                .Replace("{user}", message.Author.Mention, StringComparison.OrdinalIgnoreCase)
+                .Replace("{level}", result.NewLevel.ToString(), StringComparison.OrdinalIgnoreCase));
+
+            var reward = (await db.GetRoleRewardsAsync(guild.Id.ToString())).FirstOrDefault(rr => rr.Level == result.NewLevel);
+            if (reward != null && ulong.TryParse(reward.RoleId, out var roleId) && guild.GetUser(message.Author.Id) is { } member)
+            {
+                var role = guild.GetRole(roleId);
+                if (role != null && !member.Roles.Any(existingRole => existingRole.Id == role.Id))
+                {
+                    await member.AddRoleAsync(role);
+                }
+            }
         }
-        
+
         var argPos = 0;
-        if (message.HasStringPrefix(_config.Prefix, ref argPos))
+        if (!message.HasStringPrefix(_config.Prefix, ref argPos)) return;
+
+        var context = new SocketCommandContext(_client, message);
+        var commandName = message.Content[argPos..].Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLowerInvariant();
+        var resultCommand = await _commands.ExecuteAsync(context, argPos, scope.ServiceProvider);
+        if (resultCommand.IsSuccess || string.IsNullOrWhiteSpace(commandName) || resultCommand.Error != CommandError.UnknownCommand) return;
+
+        var customCommand = (await db.GetCustomCommandsAsync(guild.Id.ToString()))
+            .FirstOrDefault(cmd => string.Equals(cmd.CommandName, commandName, StringComparison.OrdinalIgnoreCase));
+        if (customCommand != null)
         {
-            var context = new SocketCommandContext(_client, message);
-            await _commands.ExecuteAsync(context, argPos, scope.ServiceProvider);
+            await message.Channel.SendMessageAsync(customCommand.Response);
         }
     }
 
@@ -161,7 +178,7 @@ public class DiscordBotService : BackgroundService
             _logger.LogError(ex, "Error handling interaction");
             if (interaction.Type == InteractionType.ApplicationCommand)
             {
-                await interaction.GetOriginalResponseAsync().ContinueWith(async (msg) => await msg.Result.DeleteAsync());
+                await interaction.GetOriginalResponseAsync().ContinueWith(async msg => await msg.Result.DeleteAsync());
             }
         }
     }
@@ -170,24 +187,22 @@ public class DiscordBotService : BackgroundService
     {
         using var scope = _services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
-        
-        // 1. Starboard
+
         var starboard = scope.ServiceProvider.GetRequiredService<Core.Services.StarboardService>();
         await starboard.HandleReactionAsync(cachedMessage, cachedChannel, reaction);
-        
-        // 2. Reaction Roles
+
         if (reaction.User.Value is not IGuildUser user || user.IsBot) return;
-        
+
         var guildId = user.Guild.Id.ToString();
         var reactionRoles = await db.GetReactionRolesAsync(guildId);
-        
-        var match = reactionRoles.FirstOrDefault(rr => 
-            rr.MessageId == reaction.MessageId.ToString() && 
+
+        var match = reactionRoles.FirstOrDefault(rr =>
+            rr.MessageId == reaction.MessageId.ToString() &&
             rr.Emoji == reaction.Emote.Name);
 
-        if (match != null)
+        if (match != null && ulong.TryParse(match.RoleId, out var roleId))
         {
-            var role = user.Guild.GetRole(ulong.Parse(match.RoleId));
+            var role = user.Guild.GetRole(roleId);
             if (role != null) await user.AddRoleAsync(role);
         }
     }
@@ -202,13 +217,13 @@ public class DiscordBotService : BackgroundService
         var guildId = user.Guild.Id.ToString();
         var reactionRoles = await db.GetReactionRolesAsync(guildId);
 
-        var match = reactionRoles.FirstOrDefault(rr => 
-            rr.MessageId == reaction.MessageId.ToString() && 
+        var match = reactionRoles.FirstOrDefault(rr =>
+            rr.MessageId == reaction.MessageId.ToString() &&
             rr.Emoji == reaction.Emote.Name);
 
-        if (match != null)
+        if (match != null && ulong.TryParse(match.RoleId, out var roleId))
         {
-            var role = user.Guild.GetRole(ulong.Parse(match.RoleId));
+            var role = user.Guild.GetRole(roleId);
             if (role != null) await user.RemoveRoleAsync(role);
         }
     }
@@ -218,33 +233,132 @@ public class DiscordBotService : BackgroundService
         using var scope = _services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
         var visuals = scope.ServiceProvider.GetRequiredService<Core.Services.VisualService>();
-        
+
         var guildId = user.Guild.Id.ToString();
+        if (await HandleRaidDetectionAsync(user, db))
+        {
+            return;
+        }
+
         var settings = await db.GetGuildSettingsOrDefaultAsync(guildId);
 
-        // 1. Auto-Role
-        if (!string.IsNullOrEmpty(settings.AutoRole))
+        if (!string.IsNullOrEmpty(settings.AutoRole) && ulong.TryParse(settings.AutoRole, out var autoRoleId))
         {
-            var role = user.Guild.GetRole(ulong.Parse(settings.AutoRole));
+            var role = user.Guild.GetRole(autoRoleId);
             if (role != null) await user.AddRoleAsync(role);
         }
 
-        // 2. Welcome Message & Card
-        if (!string.IsNullOrEmpty(settings.WelcomeChannel))
-        {
-            var channel = user.Guild.TextChannels.FirstOrDefault(c => c.Name == settings.WelcomeChannel);
-            if (channel != null)
-            {
-                var imageBytes = await visuals.CreateWelcomeCardAsync(
-                    user.Username,
-                    user.Guild.MemberCount,
-                    user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl(),
-                    settings.WelcomeBackground
-                );
+        var channel = TryGetTextChannel(user.Guild, settings.WelcomeChannel);
+        if (channel == null) return;
 
-                using var ms = new System.IO.MemoryStream(imageBytes);
-                await channel.SendFileAsync(ms, "welcome.png", $"Welcome {user.Mention} to **{user.Guild.Name}**!");
+        var imageBytes = await visuals.CreateWelcomeCardAsync(
+            user.Username,
+            user.Guild.MemberCount,
+            user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl(),
+            settings.WelcomeBackground);
+
+        var welcomeMessage = string.IsNullOrWhiteSpace(settings.WelcomeMessage)
+            ? $"Welcome {user.Mention} to **{user.Guild.Name}**!"
+            : settings.WelcomeMessage
+                .Replace("{user}", user.Mention, StringComparison.OrdinalIgnoreCase)
+                .Replace("{server}", user.Guild.Name, StringComparison.OrdinalIgnoreCase)
+                .Replace("{memberCount}", user.Guild.MemberCount.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        using var ms = new System.IO.MemoryStream(imageBytes);
+        await channel.SendFileAsync(ms, "welcome.png", welcomeMessage);
+    }
+
+    private async Task HandleUserLeftAsync(SocketGuild guild, SocketUser user)
+    {
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
+        var settings = await db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
+        var channel = TryGetTextChannel(guild, settings.LeaveChannel);
+        if (channel == null) return;
+
+        var leaveMessage = string.IsNullOrWhiteSpace(settings.LeaveMessage)
+            ? $"{user.Username} has left the server. We now have {guild.MemberCount} members."
+            : settings.LeaveMessage
+                .Replace("{user}", user.Username, StringComparison.OrdinalIgnoreCase)
+                .Replace("{server}", guild.Name, StringComparison.OrdinalIgnoreCase)
+                .Replace("{memberCount}", guild.MemberCount.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        await channel.SendMessageAsync(leaveMessage);
+    }
+
+    private async Task<bool> HandleRaidDetectionAsync(SocketGuildUser user, Core.Data.IDatabaseService db)
+    {
+        var guildId = user.Guild.Id.ToString();
+        var settings = await db.GetRaidSettingsOrDefaultAsync(guildId);
+        var queue = JoinTracker.GetOrAdd(guildId, _ => new Queue<DateTimeOffset>());
+        var now = DateTimeOffset.UtcNow;
+        var timeWindow = settings.TimeWindow > 0 ? settings.TimeWindow : 10;
+        var threshold = settings.JoinThreshold > 0 ? settings.JoinThreshold : 5;
+        var recentCount = 0;
+
+        lock (queue)
+        {
+            queue.Enqueue(now);
+            while (queue.Count > 0 && (now - queue.Peek()).TotalSeconds > timeWindow)
+            {
+                queue.Dequeue();
             }
+
+            recentCount = queue.Count;
         }
+
+        if (settings.Enabled != 1 || recentCount <= threshold)
+        {
+            return false;
+        }
+
+        var content = $"Detected {recentCount} joins within {timeWindow} seconds. Action: {settings.Action}. User: {user.Id}";
+        await db.AddAuditLogAsync(guildId, "RAID_DETECTED", user.Id.ToString(), content);
+        await db.AddRaidIncidentAsync(guildId, recentCount, settings.Action, JsonSerializer.Serialize(new[] { user.Id.ToString() }));
+
+        var alertChannel = TryGetTextChannel(user.Guild, settings.AlertChannel);
+        if (alertChannel != null)
+        {
+            var embed = new EmbedBuilder()
+                .WithTitle("🚨 Raid Detected")
+                .WithColor(Color.Red)
+                .WithDescription($"{recentCount} joins detected in {timeWindow} seconds.")
+                .AddField("Action", settings.Action, true)
+                .AddField("Latest User", user.Mention, true)
+                .WithCurrentTimestamp()
+                .Build();
+            await alertChannel.SendMessageAsync(embed: embed);
+        }
+
+        switch ((settings.Action ?? "kick").ToLowerInvariant())
+        {
+            case "kick":
+                await user.KickAsync("Raid protection triggered");
+                break;
+            case "ban":
+                await user.BanAsync(0, "Raid protection triggered");
+                break;
+            case "lockdown":
+                foreach (var channel in user.Guild.TextChannels)
+                {
+                    await channel.ModifyAsync(props => props.SlowModeInterval = 10);
+                }
+                await db.AddAuditLogAsync(guildId, "RAID_LOCKDOWN", user.Id.ToString(), "Applied 10-second slowmode to all text channels");
+                break;
+        }
+
+        return true;
+    }
+
+    private static SocketTextChannel? TryGetTextChannel(SocketGuild guild, string? channelIdOrName)
+    {
+        if (string.IsNullOrWhiteSpace(channelIdOrName)) return null;
+        if (ulong.TryParse(channelIdOrName, out var channelId))
+        {
+            return guild.GetTextChannel(channelId);
+        }
+
+        return guild.TextChannels.FirstOrDefault(channel =>
+            string.Equals(channel.Name, channelIdOrName, StringComparison.OrdinalIgnoreCase));
     }
 }

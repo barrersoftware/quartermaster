@@ -52,6 +52,14 @@ public class ShopItem
     public string? RoleId { get; set; }
 }
 
+public class RoleReward
+{
+    public int Id { get; set; }
+    public string GuildId { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public string RoleId { get; set; } = string.Empty;
+}
+
 public class AuditLog
 {
     public int Id { get; set; }

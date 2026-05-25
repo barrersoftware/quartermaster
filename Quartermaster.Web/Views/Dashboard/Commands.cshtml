@@ -1,0 +1,106 @@
+@model IEnumerable<Quartermaster.Core.Models.CustomCommand>
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    ViewData["Title"] = "Commands - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Custom Commands</span>
+        </div>
+
+        <h1>💬 Custom Commands</h1>
+        <p>Create and manage simple text commands for your community.</p>
+
+        <div class="settings-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px;">
+            <div class="settings-section">
+                <h2>Existing Commands</h2>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Response</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr><td colspan="3" class="muted">No custom commands have been created yet.</td></tr>
+                        }
+                        else
+                        {
+                            foreach (var command in Model)
+                            {
+                                <tr>
+                                    <td><code>@command.CommandName</code></td>
+                                    <td>@command.Response</td>
+                                    <td><button type="button" class="btn btn-small btn-danger" onclick="deleteCommand('@command.CommandName')">Delete</button></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="settings-section">
+                <h2>Add Command</h2>
+                <form id="commandForm">
+                    <div class="form-group">
+                        <label>Command Name</label>
+                        <input type="text" name="commandName" class="input-field" placeholder="rules" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Response</label>
+                        <textarea name="response" class="input-field" rows="5" placeholder="Welcome aboard! Read the rules in #rules." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Command</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('commandForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        commandName: formData.get('commandName'),
+                        response: formData.get('response'),
+                        createdBy: 'dashboard'
+                    })
+                });
+                const data = await response.json();
+                if (data.success) location.reload();
+                else alert(data.error || 'Failed to add command.');
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            }
+        });
+
+        async function deleteCommand(name) {
+            if (!confirm(`Delete the custom command ${name}?`)) return;
+            try {
+                const response = await fetch(`/api/server/${guildId}/commands/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (data.success) location.reload();
+                else alert(data.error || 'Failed to delete command.');
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            }
+        }
+    </script>
+}

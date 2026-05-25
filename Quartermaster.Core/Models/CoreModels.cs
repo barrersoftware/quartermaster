@@ -44,6 +44,8 @@ public class GuildSetting
     public string ModRoles { get; set; } = "[]";
     public string? RankBackground { get; set; }
     public string? WelcomeBackground { get; set; }
+    public string? WelcomeMessage { get; set; }
+    public string? LeaveMessage { get; set; }
     public int LevelingEnabled { get; set; } = 1;
     public string? LevelUpMessage { get; set; }
 }

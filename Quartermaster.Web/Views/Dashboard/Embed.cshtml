@@ -1,0 +1,78 @@
+@{
+    var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
+    var channels = ViewBag.Channels as IEnumerable<Quartermaster.Web.Services.DiscordChannel> ?? new List<Quartermaster.Web.Services.DiscordChannel>();
+    ViewData["Title"] = "Embed Builder - " + guild?.Name;
+}
+
+<div class="dashboard-container">
+    <div class="container">
+        <div class="breadcrumb">
+            <a asp-action="Index">Dashboard</a> /
+            <a href="/dashboard/server/@guild?.Id">@guild?.Name</a> /
+            <span>Embed Builder</span>
+        </div>
+
+        <h1>📝 Embed Builder</h1>
+        <p>Draft a custom embed for announcements, events, or server updates.</p>
+
+        <div class="settings-section">
+            <form id="embedForm">
+                <div class="form-group">
+                    <label>Channel</label>
+                    <select name="channelId" class="input-select" required>
+                        <option value="">Select a channel</option>
+                        @foreach (var channel in channels)
+                        {
+                            <option value="@channel.Id">#@channel.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" name="title" class="input-field" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" class="input-field" rows="6" required></textarea>
+                </div>
+
+                <div class="form-row" style="display:grid; grid-template-columns: 180px 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Color</label>
+                        <input type="color" name="color" class="color-input" value="#5865F2">
+                    </div>
+                    <div class="form-group">
+                        <label>Footer</label>
+                        <input type="text" name="footer" class="input-field" placeholder="Optional footer text">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Send Embed</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const guildId = '@guild?.Id';
+
+        document.getElementById('embedForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/embed/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.fromEntries(formData.entries()))
+                });
+                const data = await response.json();
+                alert(data.success ? 'Embed sent!' : (data.error || 'Embed sending is not available from the dashboard yet.'));
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            }
+        });
+    </script>
+}

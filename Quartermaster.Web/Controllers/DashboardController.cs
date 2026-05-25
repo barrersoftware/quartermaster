@@ -65,7 +65,19 @@ public class DashboardController : Controller
         var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
         ViewBag.Guild = guild;
         ViewBag.Channels = (await _discordApi.GetGuildChannelsAsync(guildId, _botToken)).Where(c => c.Type == 0);
+        ViewBag.Roles = await _discordApi.GetGuildRolesAsync(guildId, _botToken);
+        ViewBag.RoleRewards = await _db.GetRoleRewardsAsync(guildId);
         return View(settings);
+    }
+
+    [HttpGet("server/{guildId}/leaderboard")]
+    public async Task<IActionResult> Leaderboard(string guildId)
+    {
+        var (guild, _) = await GetValidatedGuild(guildId);
+        if (guild == null) return Forbid();
+        var leaderboard = await _db.GetLeaderboardAsync(guildId, 25);
+        ViewBag.Guild = guild;
+        return View(leaderboard);
     }
 
     [HttpGet("server/{guildId}/moderation")]
@@ -76,7 +88,7 @@ public class DashboardController : Controller
 
         var automod = await _db.GetAutomodSettingsOrDefaultAsync(guildId);
         ViewBag.Blacklist = await _db.GetBlacklistWordsAsync(guildId);
-        ViewBag.Warnings = new List<Quartermaster.Core.Models.Warning>(); // Simplified
+        ViewBag.Warnings = await _db.GetWarningsAsync(guildId);
         ViewBag.Guild = guild;
         return View(automod);
     }
@@ -105,13 +117,33 @@ public class DashboardController : Controller
         return View(shopItems);
     }
 
+    [HttpGet("server/{guildId}/commands")]
+    public async Task<IActionResult> Commands(string guildId)
+    {
+        var (guild, _) = await GetValidatedGuild(guildId);
+        if (guild == null) return Forbid();
+        var commands = await _db.GetCustomCommandsAsync(guildId);
+        ViewBag.Guild = guild;
+        return View(commands);
+    }
+
+    [HttpGet("server/{guildId}/embed")]
+    public async Task<IActionResult> Embed(string guildId)
+    {
+        var (guild, _) = await GetValidatedGuild(guildId);
+        if (guild == null) return Forbid();
+        ViewBag.Channels = (await _discordApi.GetGuildChannelsAsync(guildId, _botToken)).Where(c => c.Type == 0);
+        ViewBag.Guild = guild;
+        return View();
+    }
+
     [HttpGet("server/{guildId}/logs")]
     public async Task<IActionResult> Logs(string guildId)
     {
         var (guild, _) = await GetValidatedGuild(guildId);
         if (guild == null) return Forbid();
 
-        var logs = new List<Quartermaster.Core.Models.AuditLog>(); 
+        var logs = await _db.GetAuditLogsAsync(guildId, 50);
         ViewBag.Guild = guild;
         return View(logs);
     }
