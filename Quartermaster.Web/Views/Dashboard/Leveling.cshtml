@@ -43,7 +43,7 @@
             <form id="announcementForm">
                 <div class="form-group">
                     <label>Announcement Channel</label>
-                    <select name="level_up_channel" class="input-select">
+                    <select name="LevelUpChannel" class="input-select">
                         <option value="">In the channel where it happened (Current Channel)</option>
                         @foreach (var channel in channels)
                         {
@@ -85,43 +85,49 @@
 
         document.getElementById('levelingForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const response = await fetch(`/api/server/${guildId}/settings/leveling`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    enabled: formData.get('enabled') === 'on',
-                    levelUpMessage: formData.get('levelUpMessage')
-                })
-            });
-            const data = await response.json();
-            alert(data.success ? 'Leveling settings saved!' : 'Error saving settings');
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/settings/leveling`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        enabled: formData.get('enabled') === 'on',
+                        levelUpMessage: formData.get('levelUpMessage')
+                    })
+                });
+                const data = await response.json();
+                alert(data.success ? 'Leveling settings saved!' : 'Error saving settings');
+            } catch (err) { alert('Network error: ' + err.message); }
         });
 
         document.getElementById('announcementForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const response = await fetch(`/api/server/${guildId}/settings/leveling`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    levelUpChannel: formData.get('level_up_channel') || null
-                })
-            });
-            const data = await response.json();
-            alert(data.success ? 'Announcement settings saved!' : 'Error saving settings');
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/settings/leveling`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        levelUpChannel: formData.get('LevelUpChannel') || null
+                    })
+                });
+                const data = await response.json();
+                alert(data.success ? 'Announcement settings saved!' : 'Error saving settings');
+            } catch (err) { alert('Network error: ' + err.message); }
         });
 
         document.getElementById('visualForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const response = await fetch(`/api/server/${guildId}/settings/visuals`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData.entries()))
-            });
-            const data = await response.json();
-            alert(data.success ? 'Visuals updated!' : 'Update failed');
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/settings/visuals`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.fromEntries(formData.entries()))
+                });
+                const data = await response.json();
+                alert(data.success ? 'Visuals updated!' : 'Update failed');
+            } catch (err) { alert('Network error: ' + err.message); }
         });
     </script>
 }

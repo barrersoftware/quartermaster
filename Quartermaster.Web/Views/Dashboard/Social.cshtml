@@ -65,11 +65,11 @@
                     </div>
                     <div class="form-group">
                         <label>Channel Name / ID</label>
-                        <input type="text" name="channel" class="input-field" placeholder="e.g. g4turbo" required>
+                        <input type="text" name="ChannelName" class="input-field" placeholder="e.g. g4turbo" required>
                     </div>
                     <div class="form-group">
                         <label>Discord Alert Channel</label>
-                        <select name="alert_channel_id" class="input-select" required>
+                        <select name="AlertChannelId" class="input-select" required>
                             @foreach (var ch in channels)
                             {
                                 <option value="@ch.Id">#@ch.Name</option>
@@ -91,21 +91,26 @@
 
         document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const response = await fetch(`/api/server/${guildId}/social`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData.entries()))
-            });
-            if (response.ok) location.reload();
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/social`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.fromEntries(formData.entries()))
+                });
+                if (response.ok) location.reload();
+                else alert('Failed to add alert: ' + response.statusText);
+            } catch (err) { alert('Network error: ' + err.message); }
         });
 
         async function deleteAlert(platform, channel) {
             if (!confirm(`Delete ${platform} alert for "${channel}"?`)) return;
-            const response = await fetch(`/api/server/${guildId}/social/${platform}/${encodeURIComponent(channel)}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) location.reload();
+            try {
+                const response = await fetch(`/api/server/${guildId}/social/${platform}/${encodeURIComponent(channel)}`, {
+                    method: 'DELETE'
+                });
+                if (response.ok) location.reload();
+            } catch (err) { alert('Network error: ' + err.message); }
         }
     </script>
 }

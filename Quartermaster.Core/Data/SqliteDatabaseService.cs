@@ -503,7 +503,9 @@ public class SqliteDatabaseService : IDatabaseService
                 mod_roles TEXT DEFAULT '[]',
                 rank_background TEXT,
                 welcome_background TEXT,
-                level_up_channel TEXT
+                level_up_channel TEXT,
+                leveling_enabled INTEGER DEFAULT 1,
+                level_up_message TEXT
             );
 
             CREATE TABLE IF NOT EXISTS raid_settings (

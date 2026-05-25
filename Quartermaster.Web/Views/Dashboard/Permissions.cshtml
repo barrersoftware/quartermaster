@@ -2,7 +2,7 @@
 @{
     var guild = ViewBag.Guild as Quartermaster.Web.Services.DiscordGuild;
     var roles = ViewBag.Roles as IEnumerable<Quartermaster.Web.Services.DiscordRole> ?? new List<Quartermaster.Web.Services.DiscordRole>();
-    var modRoles = Model.ModRoles != null ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(Model.ModRoles) : new List<string>();
+    var modRoles = Model.ModRoles != null ? (System.Text.Json.JsonSerializer.Deserialize<List<string>>(Model.ModRoles) ?? new List<string>()) : new List<string>();
     ViewData["Title"] = "Permissions - " + guild?.Name;
 }
 

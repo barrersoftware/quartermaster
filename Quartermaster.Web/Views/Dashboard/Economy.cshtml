@@ -69,7 +69,7 @@
                         </div>
                         <div class="form-group">
                             <label>Role to Award (Role ID)</label>
-                            <input type="text" name="role_id" class="input-field" placeholder="Optional Role ID">
+                            <input type="text" name="RoleId" class="input-field" placeholder="Optional Role ID">
                         </div>
                         <button type="submit" class="btn btn-primary" style="width: 100%;">Add to Shop</button>
                     </form>
@@ -85,23 +85,27 @@
 
         document.getElementById('addItemForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
-
-            const response = await fetch(`/api/server/${guildId}/economy/shop`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (response.ok) location.reload();
+            try {
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                const response = await fetch(`/api/server/${guildId}/economy/shop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) location.reload();
+                else alert('Failed to add item: ' + response.statusText);
+            } catch (err) { alert('Network error: ' + err.message); }
         });
 
         async function deleteItem(id) {
             if (!confirm('Remove this item from the shop?')) return;
-            const response = await fetch(`/api/server/${guildId}/economy/shop/${id}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) location.reload();
+            try {
+                const response = await fetch(`/api/server/${guildId}/economy/shop/${id}`, {
+                    method: 'DELETE'
+                });
+                if (response.ok) location.reload();
+            } catch (err) { alert('Network error: ' + err.message); }
         }
     </script>
 }

@@ -33,19 +33,19 @@
                 <div class="form-row" style="display:flex; gap:20px;">
                     <div class="form-group" style="flex:1;">
                         <label>Join Threshold</label>
-                        <input type="number" name="joinThreshold" value="@Model.JoinThreshold" min="2" max="50" class="input-field">
+                        <input type="number" name="JoinThreshold" value="@Model.JoinThreshold" min="2" max="50" class="input-field">
                         <small>Number of members joining to trigger detection.</small>
                     </div>
                     <div class="form-group" style="flex:1;">
                         <label>Time Window (seconds)</label>
-                        <input type="number" name="timeWindow" value="@Model.TimeWindow" min="5" max="300" class="input-field">
+                        <input type="number" name="TimeWindow" value="@Model.TimeWindow" min="5" max="300" class="input-field">
                         <small>The timeframe (in seconds) to count joins.</small>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Alert Channel</label>
-                    <input type="text" name="alertChannel" value="@Model.AlertChannel" class="input-field" placeholder="Channel Name (e.g. staff-chat)">
+                    <input type="text" name="AlertChannel" value="@Model.AlertChannel" class="input-field" placeholder="Channel Name (e.g. staff-chat)">
                     <small>Channel where the bot will post raid alerts.</small>
                 </div>
             </div>
@@ -66,7 +66,7 @@
 
                 <div class="form-group">
                     <label>Lockdown Duration (seconds)</label>
-                    <input type="number" name="lockdownDuration" value="@Model.LockdownDuration" min="60" max="3600" class="input-field">
+                    <input type="number" name="LockdownDuration" value="@Model.LockdownDuration" min="60" max="3600" class="input-field">
                 </div>
             </div>
 
@@ -83,17 +83,20 @@
 
         document.getElementById('raidForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
-            data.enabled = formData.get('enabled') === 'on' ? 1 : 0;
+            try {
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                data.Enabled = formData.get('enabled') === 'on' ? 1 : 0;
+                delete data.enabled;
 
-            const response = await fetch(`/api/server/${guildId}/raid`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-            alert(result.success ? 'Raid protection settings updated!' : 'Error: ' + result.error);
+                const response = await fetch(`/api/server/${guildId}/raid`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                alert(result.success ? 'Raid protection settings updated!' : 'Error: ' + result.error);
+            } catch (err) { alert('Network error: ' + err.message); }
         });
     </script>
 }

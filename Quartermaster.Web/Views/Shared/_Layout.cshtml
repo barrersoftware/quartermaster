@@ -43,6 +43,24 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        // Automatically attach XSRF token to all non-GET fetch requests
+        (function () {
+            const _fetch = window.fetch;
+            window.fetch = async function (url, opts = {}) {
+                if (opts.method && opts.method.toUpperCase() !== 'GET') {
+                    const token = document.cookie.split('; ')
+                        .find(r => r.startsWith('XSRF-TOKEN='))?.split('=')[1];
+                    if (token) {
+                        opts.headers = Object.assign({}, opts.headers, {
+                            'X-XSRF-TOKEN': decodeURIComponent(token)
+                        });
+                    }
+                }
+                return _fetch(url, opts);
+            };
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -33,6 +33,15 @@ builder.Services.AddControllersWithViews().AddJsonOptions(options =>
     options.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
 });
 builder.Services.AddHttpClient();
+
+// CSRF protection: expose token via cookie so JS can read and send as X-XSRF-TOKEN header
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.Cookie.Name = "XSRF-TOKEN";
+    options.Cookie.HttpOnly = false; // JS must be able to read this cookie
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
 builder.Services.AddScoped<Quartermaster.Web.Services.DiscordApiService>();
 
 // Data Services
@@ -125,6 +134,23 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Set XSRF-TOKEN cookie on every authenticated request so JS fetch can include it
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<Microsoft.AspNetCore.Antiforgery.IAntiforgery>();
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
+        {
+            HttpOnly = false,
+            SameSite = SameSiteMode.Lax,
+            Secure = false
+        });
+    }
+    await next();
+});
 
 // Set the port from configuration
 var port = builder.Configuration.GetValue<int?>("Discord:Port") ?? 3000;

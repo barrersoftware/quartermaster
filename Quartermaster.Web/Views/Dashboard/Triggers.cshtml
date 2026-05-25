@@ -53,15 +53,15 @@
                 <form id="addTriggerForm" style="margin-top: 15px;">
                     <div class="form-group">
                         <label>Trigger Phrase</label>
-                        <input type="text" name="phrase" class="input-field" placeholder="e.g. how to join" required>
+                        <input type="text" name="TriggerPhrase" class="input-field" placeholder="e.g. how to join" required>
                     </div>
                     <div class="form-group">
                         <label>Response Content</label>
-                        <textarea name="response" rows="3" class="input-field" required></textarea>
+                        <textarea name="Response" rows="3" class="input-field" required></textarea>
                     </div>
                     <div class="form-group">
                         <label>Response Type</label>
-                        <select name="type" class="input-select">
+                        <select name="Type" class="input-select">
                             <option value="text">Plain Text</option>
                             <option value="embed">Rich Embed</option>
                         </select>
@@ -79,21 +79,26 @@
 
         document.getElementById('addTriggerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
-            const response = await fetch(`/api/server/${guildId}/triggers`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData.entries()))
-            });
-            if (response.ok) location.reload();
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch(`/api/server/${guildId}/triggers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.fromEntries(formData.entries()))
+                });
+                if (response.ok) location.reload();
+                else alert('Failed to create trigger: ' + response.statusText);
+            } catch (err) { alert('Network error: ' + err.message); }
         });
 
         async function deleteTrigger(phrase) {
             if (!confirm(`Delete trigger for "${phrase}"?`)) return;
-            const response = await fetch(`/api/server/${guildId}/triggers/${encodeURIComponent(phrase)}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) location.reload();
+            try {
+                const response = await fetch(`/api/server/${guildId}/triggers/${encodeURIComponent(phrase)}`, {
+                    method: 'DELETE'
+                });
+                if (response.ok) location.reload();
+            } catch (err) { alert('Network error: ' + err.message); }
         }
     </script>
 }

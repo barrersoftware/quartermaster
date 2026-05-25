@@ -26,27 +26,36 @@ public class DiscordApiService
     {
         var content = await GetAsync("https://discord.com/api/users/@me/guilds", accessToken);
         if (string.IsNullOrEmpty(content)) return new List<DiscordGuild>();
-        return JsonSerializer.Deserialize<List<DiscordGuild>>(content) ?? new List<DiscordGuild>();
+        try { return JsonSerializer.Deserialize<List<DiscordGuild>>(content) ?? new List<DiscordGuild>(); }
+        catch { return new List<DiscordGuild>(); }
     }
 
     public async Task<List<DiscordRole>> GetGuildRolesAsync(string guildId, string botToken)
     {
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", botToken);
-        var response = await client.GetAsync($"https://discord.com/api/guilds/{guildId}/roles");
-        if (!response.IsSuccessStatusCode) return new List<DiscordRole>();
-        var content = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<DiscordRole>>(content) ?? new List<DiscordRole>();
+        try
+        {
+            var response = await client.GetAsync($"https://discord.com/api/guilds/{guildId}/roles");
+            if (!response.IsSuccessStatusCode) return new List<DiscordRole>();
+            var content = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<DiscordRole>>(content) ?? new List<DiscordRole>();
+        }
+        catch { return new List<DiscordRole>(); }
     }
 
     public async Task<List<DiscordChannel>> GetGuildChannelsAsync(string guildId, string botToken)
     {
         var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", botToken);
-        var response = await client.GetAsync($"https://discord.com/api/guilds/{guildId}/channels");
-        if (!response.IsSuccessStatusCode) return new List<DiscordChannel>();
-        var content = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<DiscordChannel>>(content) ?? new List<DiscordChannel>();
+        try
+        {
+            var response = await client.GetAsync($"https://discord.com/api/guilds/{guildId}/channels");
+            if (!response.IsSuccessStatusCode) return new List<DiscordChannel>();
+            var content = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<DiscordChannel>>(content) ?? new List<DiscordChannel>();
+        }
+        catch { return new List<DiscordChannel>(); }
     }
 }
 
