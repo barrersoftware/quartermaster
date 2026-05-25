@@ -64,6 +64,7 @@ builder.Services.AddAuthentication(options =>
     options.LogoutPath = "/logout";
     options.Cookie.Name = "Quartermaster.Auth";
     options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.None; // Required for HTTP
 })
 .AddDiscord(options =>
 {
@@ -75,7 +76,10 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("guilds");
     options.Scope.Add("identify");
 
-    // Force the redirect URI to match the one in Discord if DashboardUrl is configured
+    // Fix correlation cookie for HTTP
+    options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None; // Required for HTTP
+    options.CorrelationCookie.HttpOnly = true;
     options.Events.OnRedirectToAuthorizationEndpoint = context =>
     {
         var dashboardUrl = builder.Configuration["Discord:DashboardUrl"];
