@@ -39,9 +39,9 @@ public class ServerApiController : ControllerBase
     public async Task<IActionResult> UpdateLeveling(string guildId, [FromBody] LevelingUpdateModel model)
     {
         var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
-        settings.LevelingEnabled = model.Enabled ? 1 : 0;
+        if (model.Enabled.HasValue) settings.LevelingEnabled = model.Enabled.Value ? 1 : 0;
         if (model.LevelUpMessage != null) settings.LevelUpMessage = model.LevelUpMessage;
-        if (model.LevelUpChannel != null) settings.LevelUpChannel = model.LevelUpChannel;
+        if (model.UpdateChannel) settings.LevelUpChannel = model.LevelUpChannel;
         await SaveSettings(guildId, settings);
         return Ok(new { success = true });
     }
@@ -340,9 +340,11 @@ public class ServerApiController : ControllerBase
 
     public class LevelingUpdateModel
     {
-        public bool Enabled { get; set; } = true;
+        public bool? Enabled { get; set; }
         public string? LevelUpMessage { get; set; }
         public string? LevelUpChannel { get; set; }
+        /// <summary>True when the caller explicitly wants to set/clear LevelUpChannel.</summary>
+        public bool UpdateChannel { get; set; } = false;
     }
 
     public class RoleRewardRequest

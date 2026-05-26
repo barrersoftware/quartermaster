@@ -153,6 +153,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        updateChannel: true,
                         levelUpChannel: formData.get('LevelUpChannel') || null
                     })
                 });
