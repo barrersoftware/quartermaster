@@ -40,10 +40,15 @@ public class LevelingService
             user = new User { UserId = userId, GuildId = guildId };
         }
 
+        // 60-second XP cooldown (same as MEE6)
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if ((now - user.LastMessage) < 60_000)
+            return (false, user.Level);
+
         user.Xp += xpAmount;
         // Also award small amount of gold (10% of XP)
         user.Gold += (int)Math.Ceiling(xpAmount * 0.1);
-        user.LastMessage = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        user.LastMessage = now;
 
         int newLevel = CalculateLevel(user.Xp);
         bool leveledUp = newLevel > user.Level;

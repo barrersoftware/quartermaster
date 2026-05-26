@@ -125,27 +125,31 @@ public class DiscordBotService : BackgroundService
         var leveling = scope.ServiceProvider.GetRequiredService<Core.Services.LevelingService>();
         var db = scope.ServiceProvider.GetRequiredService<Core.Data.IDatabaseService>();
         var guild = guildChannel.Guild;
-        var result = await leveling.AddXpAsync(message.Author.Id.ToString(), guild.Id.ToString(), Random.Shared.Next(15, 26));
+        var settings = await db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
 
-        if (result.LeveledUp)
+        if (settings.LevelingEnabled == 1)
         {
-            var settings = await db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
-            var targetChannel = TryGetTextChannel(guild, settings.LevelUpChannel) ?? (IMessageChannel)message.Channel;
-            var levelUpMessage = string.IsNullOrWhiteSpace(settings.LevelUpMessage)
-                ? "Congratulations {user}, you just advanced to level {level}!"
-                : settings.LevelUpMessage;
+            var result = await leveling.AddXpAsync(message.Author.Id.ToString(), guild.Id.ToString(), Random.Shared.Next(15, 26));
 
-            await targetChannel.SendMessageAsync(levelUpMessage
-                .Replace("{user}", message.Author.Mention, StringComparison.OrdinalIgnoreCase)
-                .Replace("{level}", result.NewLevel.ToString(), StringComparison.OrdinalIgnoreCase));
-
-            var reward = (await db.GetRoleRewardsAsync(guild.Id.ToString())).FirstOrDefault(rr => rr.Level == result.NewLevel);
-            if (reward != null && ulong.TryParse(reward.RoleId, out var roleId) && guild.GetUser(message.Author.Id) is { } member)
+            if (result.LeveledUp)
             {
-                var role = guild.GetRole(roleId);
-                if (role != null && !member.Roles.Any(existingRole => existingRole.Id == role.Id))
+                var targetChannel = TryGetTextChannel(guild, settings.LevelUpChannel) ?? (IMessageChannel)message.Channel;
+                var levelUpMessage = string.IsNullOrWhiteSpace(settings.LevelUpMessage)
+                    ? "Congratulations {user}, you just advanced to level {level}!"
+                    : settings.LevelUpMessage;
+
+                await targetChannel.SendMessageAsync(levelUpMessage
+                    .Replace("{user}", message.Author.Mention, StringComparison.OrdinalIgnoreCase)
+                    .Replace("{level}", result.NewLevel.ToString(), StringComparison.OrdinalIgnoreCase));
+
+                var reward = (await db.GetRoleRewardsAsync(guild.Id.ToString())).FirstOrDefault(rr => rr.Level == result.NewLevel);
+                if (reward != null && ulong.TryParse(reward.RoleId, out var roleId) && guild.GetUser(message.Author.Id) is { } member)
                 {
-                    await member.AddRoleAsync(role);
+                    var role = guild.GetRole(roleId);
+                    if (role != null && !member.Roles.Any(existingRole => existingRole.Id == role.Id))
+                    {
+                        await member.AddRoleAsync(role);
+                    }
                 }
             }
         }
