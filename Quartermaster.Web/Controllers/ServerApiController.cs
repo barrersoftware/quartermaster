@@ -9,7 +9,7 @@ namespace Quartermaster.Web.Controllers;
 [Authorize]
 [Route("api/server/{guildId}")]
 [ApiController]
-[AutoValidateAntiforgeryToken]
+[IgnoreAntiforgeryToken]
 public class ServerApiController : ControllerBase
 {
     private readonly IDatabaseService _db;
