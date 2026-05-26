@@ -24,6 +24,9 @@ public class VoiceXpService
     {
         foreach (var guild in _client.Guilds)
         {
+            var settings = await _db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
+            if (settings.LevelingEnabled != 1) continue;
+
             foreach (var user in guild.Users)
             {
                 if (user.IsBot || user.VoiceChannel == null) continue;
@@ -36,14 +39,23 @@ public class VoiceXpService
                 
                 if (result.LeveledUp)
                 {
-                    var settings = await _db.GetGuildSettingsOrDefaultAsync(guild.Id.ToString());
-                    var channel = settings.LevelUpChannel != null 
-                        ? (guild.GetTextChannel(ulong.Parse(settings.LevelUpChannel)))
-                        : guild.SystemChannel ?? guild.TextChannels.FirstOrDefault();
+                    ITextChannel? channel = null;
+                    if (!string.IsNullOrWhiteSpace(settings.LevelUpChannel) &&
+                        ulong.TryParse(settings.LevelUpChannel, out var channelId))
+                    {
+                        channel = guild.GetTextChannel(channelId);
+                    }
+                    channel ??= guild.SystemChannel ?? (ITextChannel?)guild.TextChannels.FirstOrDefault();
 
                     if (channel != null)
                     {
-                        await channel.SendMessageAsync($"🎙️ **Voice Active:** Congratulations {user.Mention}, you just advanced to level {result.NewLevel}!");
+                        var levelUpMessage = string.IsNullOrWhiteSpace(settings.LevelUpMessage)
+                            ? "🎙️ **Voice Active:** Congratulations {user}, you just advanced to level {level}!"
+                            : settings.LevelUpMessage;
+
+                        await channel.SendMessageAsync(levelUpMessage
+                            .Replace("{user}", user.Mention, StringComparison.OrdinalIgnoreCase)
+                            .Replace("{level}", result.NewLevel.ToString(), StringComparison.OrdinalIgnoreCase));
                     }
                 }
             }

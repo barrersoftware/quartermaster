@@ -47,8 +47,7 @@
                         <option value="">In the channel where it happened</option>
                         @foreach (var channel in channels)
                         {
-                            var isSelected = Model.LevelUpChannel == channel.Id;
-                            <option value="@channel.Id" selected="@isSelected">#@channel.Name</option>
+                            <option value="@channel.Id" selected="@(Model.LevelUpChannel == channel.Id ? "selected" : null)">#@channel.Name</option>
                         }
                     </select>
                 </div>
