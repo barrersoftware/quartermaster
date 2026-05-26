@@ -745,5 +745,7 @@ public class SqliteDatabaseService : IDatabaseService
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN level_up_message TEXT"); } catch { }
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN welcome_message TEXT"); } catch { }
         try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN leave_message TEXT"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN rank_background TEXT"); } catch { }
+        try { await db.ExecuteAsync("ALTER TABLE guild_settings ADD COLUMN welcome_background TEXT"); } catch { }
     }
 }
