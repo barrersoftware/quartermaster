@@ -39,6 +39,11 @@ public class VoiceXpService
                 
                 if (result.LeveledUp)
                 {
+                    if (string.Equals(settings.LevelUpChannel, "disabled", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     ITextChannel? channel = null;
                     if (!string.IsNullOrWhiteSpace(settings.LevelUpChannel) &&
                         ulong.TryParse(settings.LevelUpChannel, out var channelId))

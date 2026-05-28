@@ -57,9 +57,10 @@ public partial class EconomyModule
         }
 
         game.PlayerHand.Add(game.DrawCard());
-        if (BlackjackGame.CalculateHandValue(game.PlayerHand) >= 21)
+        var handValue = BlackjackGame.CalculateHandValue(game.PlayerHand);
+        if (handValue >= 21)
         {
-            await ResolveBlackjackAsync(userId, game, standRequested: false);
+            await ResolveBlackjackAsync(userId, game, standRequested: handValue == 21);
             return;
         }
 

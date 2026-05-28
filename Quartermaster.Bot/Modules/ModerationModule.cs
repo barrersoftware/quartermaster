@@ -145,7 +145,9 @@ public class ModerationModule : InteractionModuleBase<SocketInteractionContext>
 
         var messageReason = reason ?? "No reason provided";
         var expiresAt = DateTimeOffset.UtcNow.AddHours(durationHours);
+        
         await user.Guild.AddBanAsync(user, 0, $"{messageReason} | Tempban for {durationHours} hour(s)");
+        await _db.AddTempBanAsync(Context.Guild.Id.ToString(), user.Id.ToString(), expiresAt.ToUnixTimeSeconds());
         await _db.AddAuditLogAsync(Context.Guild.Id.ToString(), "MOD_TEMPBAN", user.Id.ToString(), $"{messageReason} | Expires {expiresAt:O}");
         await RespondAsync($"⏳ {user.Username} has been banned for {durationHours} hour(s).", ephemeral: true);
     }

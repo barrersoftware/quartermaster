@@ -49,3 +49,11 @@ public class GuildSetting
     public int LevelingEnabled { get; set; } = 1;
     public string? LevelUpMessage { get; set; }
 }
+
+public class TempBan
+{
+    public string GuildId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public long BannedAt { get; set; }
+    public long ExpiresAt { get; set; }
+}

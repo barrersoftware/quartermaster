@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Quartermaster.Core.Data;
 using Quartermaster.Web.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace Quartermaster.Web.Controllers;
 
@@ -70,16 +71,6 @@ public class DashboardController : Controller
         return View(settings);
     }
 
-    [HttpGet("server/{guildId}/leaderboard")]
-    public async Task<IActionResult> Leaderboard(string guildId)
-    {
-        var (guild, _) = await GetValidatedGuild(guildId);
-        if (guild == null) return Forbid();
-        var leaderboard = await _db.GetLeaderboardAsync(guildId, 25);
-        ViewBag.Guild = guild;
-        return View(leaderboard);
-    }
-
     [HttpGet("server/{guildId}/moderation")]
     public async Task<IActionResult> Moderation(string guildId)
     {
@@ -88,7 +79,7 @@ public class DashboardController : Controller
 
         var automod = await _db.GetAutomodSettingsOrDefaultAsync(guildId);
         ViewBag.Blacklist = await _db.GetBlacklistWordsAsync(guildId);
-        ViewBag.Warnings = await _db.GetWarningsAsync(guildId);
+        ViewBag.Warnings = await _db.GetWarningsAsync(guildId); 
         ViewBag.Guild = guild;
         return View(automod);
     }
@@ -100,7 +91,7 @@ public class DashboardController : Controller
         if (guild == null) return Forbid();
 
         var raid = await _db.GetRaidSettingsOrDefaultAsync(guildId);
-        ViewBag.Incidents = new List<dynamic>();
+        ViewBag.Incidents = new List<dynamic>(); // History logic can be added later
         ViewBag.Guild = guild;
         ViewBag.Channels = (await _discordApi.GetGuildChannelsAsync(guildId, _botToken)).Where(c => c.Type == 0);
         return View(raid);
@@ -117,33 +108,13 @@ public class DashboardController : Controller
         return View(shopItems);
     }
 
-    [HttpGet("server/{guildId}/commands")]
-    public async Task<IActionResult> Commands(string guildId)
-    {
-        var (guild, _) = await GetValidatedGuild(guildId);
-        if (guild == null) return Forbid();
-        var commands = await _db.GetCustomCommandsAsync(guildId);
-        ViewBag.Guild = guild;
-        return View(commands);
-    }
-
-    [HttpGet("server/{guildId}/embed")]
-    public async Task<IActionResult> Embed(string guildId)
-    {
-        var (guild, _) = await GetValidatedGuild(guildId);
-        if (guild == null) return Forbid();
-        ViewBag.Channels = (await _discordApi.GetGuildChannelsAsync(guildId, _botToken)).Where(c => c.Type == 0);
-        ViewBag.Guild = guild;
-        return View();
-    }
-
     [HttpGet("server/{guildId}/logs")]
     public async Task<IActionResult> Logs(string guildId)
     {
         var (guild, _) = await GetValidatedGuild(guildId);
         if (guild == null) return Forbid();
 
-        var logs = await _db.GetAuditLogsAsync(guildId, 50);
+        var logs = await _db.GetAuditLogsAsync(guildId, 100); 
         ViewBag.Guild = guild;
         return View(logs);
     }

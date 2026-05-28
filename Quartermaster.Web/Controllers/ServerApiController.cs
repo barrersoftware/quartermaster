@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Quartermaster.Core.Data;
 using Quartermaster.Core.Models;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Quartermaster.Web.Controllers;
 
@@ -27,23 +28,38 @@ public class ServerApiController : ControllerBase
     [HttpPost("settings/visuals")]
     public async Task<IActionResult> UpdateVisuals(string guildId, [FromBody] VisualUpdateModel model)
     {
-        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
-        if (!string.IsNullOrEmpty(model.RankCardColor)) settings.RankCardColor = model.RankCardColor;
-        settings.RankBackground = model.RankBackground;
-        settings.WelcomeBackground = model.WelcomeBackground;
-        await SaveSettings(guildId, settings);
-        return Ok(new { success = true });
+        try
+        {
+            var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+            if (!string.IsNullOrEmpty(model.RankCardColor)) settings.RankCardColor = model.RankCardColor;
+            if (model.RankBackground != null) settings.RankBackground = model.RankBackground;
+            if (model.WelcomeBackground != null) settings.WelcomeBackground = model.WelcomeBackground;
+            await SaveSettings(guildId, settings);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
     }
 
     [HttpPost("settings/leveling")]
     public async Task<IActionResult> UpdateLeveling(string guildId, [FromBody] LevelingUpdateModel model)
     {
-        var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
-        if (model.Enabled.HasValue) settings.LevelingEnabled = model.Enabled.Value ? 1 : 0;
-        if (model.LevelUpMessage != null) settings.LevelUpMessage = model.LevelUpMessage;
-        if (model.UpdateChannel) settings.LevelUpChannel = model.LevelUpChannel;
-        await SaveSettings(guildId, settings);
-        return Ok(new { success = true });
+        try
+        {
+            var settings = await _db.GetGuildSettingsOrDefaultAsync(guildId);
+            if (model.Enabled.HasValue) settings.LevelingEnabled = model.Enabled.Value ? 1 : 0;
+            if (model.LevelUpMessage != null) settings.LevelUpMessage = model.LevelUpMessage;
+            if (model.UpdateChannel) settings.LevelUpChannel = model.LevelUpChannel;
+            
+            await SaveSettings(guildId, settings);
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
     }
 
     [HttpGet("leveling/role-rewards")]
@@ -333,17 +349,23 @@ public class ServerApiController : ControllerBase
 
     public class VisualUpdateModel
     {
+        [JsonPropertyName("RankCardColor")]
         public string? RankCardColor { get; set; }
+        [JsonPropertyName("RankBackground")]
         public string? RankBackground { get; set; }
+        [JsonPropertyName("WelcomeBackground")]
         public string? WelcomeBackground { get; set; }
     }
 
     public class LevelingUpdateModel
     {
+        [JsonPropertyName("enabled")]
         public bool? Enabled { get; set; }
+        [JsonPropertyName("levelUpMessage")]
         public string? LevelUpMessage { get; set; }
+        [JsonPropertyName("levelUpChannel")]
         public string? LevelUpChannel { get; set; }
-        /// <summary>True when the caller explicitly wants to set/clear LevelUpChannel.</summary>
+        [JsonPropertyName("updateChannel")]
         public bool UpdateChannel { get; set; } = false;
     }
 

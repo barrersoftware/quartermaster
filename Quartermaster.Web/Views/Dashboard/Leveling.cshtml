@@ -44,7 +44,8 @@
                 <div class="form-group">
                     <label>Announcement Channel</label>
                     <select name="LevelUpChannel" class="input-select">
-                        <option value="">In the channel where it happened</option>
+                        <option value="disabled" selected="@(Model.LevelUpChannel == "disabled" ? "selected" : null)">🚫 Disabled (No Announcement)</option>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.LevelUpChannel) ? "selected" : null)">In the channel where it happened</option>
                         @foreach (var channel in channels)
                         {
                             <option value="@channel.Id" selected="@(Model.LevelUpChannel == channel.Id ? "selected" : null)">#@channel.Name</option>
@@ -153,7 +154,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         updateChannel: true,
-                        levelUpChannel: formData.get('LevelUpChannel') || null
+                        levelUpChannel: formData.get('LevelUpChannel') || ""
                     })
                 });
                 const data = await response.json();
@@ -204,5 +205,20 @@
                 alert(data.success ? 'Visuals updated!' : 'Update failed');
             } catch (err) { alert('Network error: ' + err.message); }
         });
+
+        // Sync visual color picker and text hex value input
+        const colorInput = document.querySelector('input[name="RankCardColor"]');
+        const colorText = document.getElementById('colorText');
+        if (colorInput && colorText) {
+            colorInput.addEventListener('input', (e) => {
+                colorText.value = e.target.value;
+            });
+            colorText.addEventListener('input', (e) => {
+                const val = e.target.value.trim();
+                if (/^#[0-9A-F]{6}$/i.test(val)) {
+                    colorInput.value = val;
+                }
+            });
+        }
     </script>
 }

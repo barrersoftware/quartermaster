@@ -78,6 +78,11 @@ public interface IDatabaseService
     Task DeleteSocialAlertAsync(string guildId, string platform, string channelName);
     Task UpdateSocialAlertLastNotifiedAsync(int id, string notifiedId);
 
+    // Tempbans
+    Task AddTempBanAsync(string guildId, string userId, long expiresAt);
+    Task<IEnumerable<TempBan>> GetExpiredTempBansAsync(long currentTimestamp);
+    Task RemoveTempBanAsync(string guildId, string userId);
+
     Task InitializeDatabaseAsync();
 }
 
@@ -530,6 +535,33 @@ public class SqliteDatabaseService : IDatabaseService
         await db.ExecuteAsync("UPDATE social_alerts SET last_notified_id = @notifiedId WHERE id = @id", new { id, notifiedId });
     }
 
+    public async Task AddTempBanAsync(string guildId, string userId, long expiresAt)
+    {
+        using var db = GetConnection();
+        var bannedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await db.ExecuteAsync(@"
+            INSERT INTO temp_bans (guild_id, user_id, banned_at, expires_at)
+            VALUES (@guildId, @userId, @bannedAt, @expiresAt)
+            ON CONFLICT(guild_id, user_id) DO UPDATE SET expires_at = @expiresAt",
+            new { guildId, userId, bannedAt, expiresAt });
+    }
+
+    public async Task<IEnumerable<TempBan>> GetExpiredTempBansAsync(long currentTimestamp)
+    {
+        using var db = GetConnection();
+        return await db.QueryAsync<TempBan>(
+            "SELECT * FROM temp_bans WHERE expires_at <= @currentTimestamp",
+            new { currentTimestamp });
+    }
+
+    public async Task RemoveTempBanAsync(string guildId, string userId)
+    {
+        using var db = GetConnection();
+        await db.ExecuteAsync(
+            "DELETE FROM temp_bans WHERE guild_id = @guildId AND user_id = @userId",
+            new { guildId, userId });
+    }
+
     public async Task InitializeDatabaseAsync()
     {
         using var db = GetConnection();
@@ -725,6 +757,14 @@ public class SqliteDatabaseService : IDatabaseService
                 item_id INTEGER NOT NULL,
                 purchased_at INTEGER DEFAULT (strftime('%s', 'now')),
                 FOREIGN KEY (item_id) REFERENCES shop_items(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS temp_bans (
+                guild_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                banned_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL,
+                PRIMARY KEY (guild_id, user_id)
             );
 
             CREATE TABLE IF NOT EXISTS audit_logs (

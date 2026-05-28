@@ -133,14 +133,32 @@ public class DiscordBotService : BackgroundService
 
             if (result.LeveledUp)
             {
-                var targetChannel = TryGetTextChannel(guild, settings.LevelUpChannel) ?? (IMessageChannel)message.Channel;
-                var levelUpMessage = string.IsNullOrWhiteSpace(settings.LevelUpMessage)
-                    ? "Congratulations {user}, you just advanced to level {level}!"
-                    : settings.LevelUpMessage;
+                _logger.LogInformation("[LEVELUP] User {User} leveled up to {Level} in Guild {Guild}", message.Author.Username, result.NewLevel, guild.Name);
+                _logger.LogInformation("[LEVELUP] Configured Channel Setting: '{ChannelId}'", settings.LevelUpChannel);
 
-                await targetChannel.SendMessageAsync(levelUpMessage
-                    .Replace("{user}", message.Author.Mention, StringComparison.OrdinalIgnoreCase)
-                    .Replace("{level}", result.NewLevel.ToString(), StringComparison.OrdinalIgnoreCase));
+                if (string.Equals(settings.LevelUpChannel, "disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("[LEVELUP] Level up announcement is disabled for guild {GuildId}", guild.Id);
+                }
+                else
+                {
+                    var resolvedChannel = TryGetTextChannel(guild, settings.LevelUpChannel);
+                    if (resolvedChannel == null && !string.IsNullOrEmpty(settings.LevelUpChannel))
+                    {
+                        _logger.LogWarning("[LEVELUP] FAILED to resolve configured channel '{ChannelId}'. Falling back to message channel.", settings.LevelUpChannel);
+                    }
+
+                    var targetChannel = resolvedChannel ?? (IMessageChannel)message.Channel;
+                    _logger.LogInformation("[LEVELUP] Final Target Channel: #{ChannelName} ({ChannelId})", targetChannel.Name, targetChannel.Id);
+
+                    var levelUpMessage = string.IsNullOrWhiteSpace(settings.LevelUpMessage)
+                        ? "Congratulations {user}, you just advanced to level {level}!"
+                        : settings.LevelUpMessage;
+
+                    await targetChannel.SendMessageAsync(levelUpMessage
+                        .Replace("{user}", message.Author.Mention, StringComparison.OrdinalIgnoreCase)
+                        .Replace("{level}", result.NewLevel.ToString(), StringComparison.OrdinalIgnoreCase));
+                }
 
                 var reward = (await db.GetRoleRewardsAsync(guild.Id.ToString())).FirstOrDefault(rr => rr.Level == result.NewLevel);
                 if (reward != null && ulong.TryParse(reward.RoleId, out var roleId) && guild.GetUser(message.Author.Id) is { } member)
@@ -357,12 +375,14 @@ public class DiscordBotService : BackgroundService
     private static SocketTextChannel? TryGetTextChannel(SocketGuild guild, string? channelIdOrName)
     {
         if (string.IsNullOrWhiteSpace(channelIdOrName)) return null;
-        if (ulong.TryParse(channelIdOrName, out var channelId))
+        
+        var input = channelIdOrName.Trim();
+        if (ulong.TryParse(input, out var channelId))
         {
             return guild.GetTextChannel(channelId);
         }
 
         return guild.TextChannels.FirstOrDefault(channel =>
-            string.Equals(channel.Name, channelIdOrName, StringComparison.OrdinalIgnoreCase));
+            string.Equals(channel.Name, input, StringComparison.OrdinalIgnoreCase));
     }
 }

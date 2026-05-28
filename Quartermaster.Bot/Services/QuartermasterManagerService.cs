@@ -58,6 +58,7 @@ public class QuartermasterManagerService : BackgroundService
                     await voiceXpService.RewardActiveUsersAsync();
 
                     await PollSocialAlertsAsync(scope.ServiceProvider.GetRequiredService<IDatabaseService>());
+                    await CheckExpiredTempBansAsync(scope.ServiceProvider.GetRequiredService<IDatabaseService>());
                 }
             }
             catch (Exception ex)
@@ -66,6 +67,44 @@ public class QuartermasterManagerService : BackgroundService
             }
 
             await Task.Delay(_checkInterval, stoppingToken);
+        }
+    }
+
+    private async Task CheckExpiredTempBansAsync(IDatabaseService db)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        try
+        {
+            var expiredBans = await db.GetExpiredTempBansAsync(now);
+            foreach (var ban in expiredBans)
+            {
+                try
+                {
+                    if (ulong.TryParse(ban.GuildId, out var guildId) && ulong.TryParse(ban.UserId, out var userId))
+                    {
+                        var guild = _client.GetGuild(guildId);
+                        if (guild != null)
+                        {
+                            await guild.RemoveBanAsync(userId);
+                            _logger.LogInformation("[TEMPBAN] Unbanned user {UserId} in guild {GuildId} (Tempban expired)", ban.UserId, ban.GuildId);
+                            await db.AddAuditLogAsync(ban.GuildId, "MOD_UNBAN_AUTO", ban.UserId, "Tempban expired");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Failed to automatically unban user {UserId} in guild {GuildId}: {Msg}", ban.UserId, ban.GuildId, ex.Message);
+                }
+                finally
+                {
+                    // Remove from database anyway to avoid infinite retry loops on non-existent users/guilds
+                    await db.RemoveTempBanAsync(ban.GuildId, ban.UserId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing expired tempbans");
         }
     }
 
